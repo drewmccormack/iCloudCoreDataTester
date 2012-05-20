@@ -4,9 +4,9 @@
 <dict>
 	<key>com.apple.developer.ubiquity-container-identifiers</key>
 	<array>
-		<string>$(TeamIdentifierPrefix)com.mentalfaculty.iCloudCoreDataTester</string>
+		<string>$(TeamIdentifierPrefix)com.mentalfaculty.${PRODUCT_NAME:rfc1034identifier}</string>
 	</array>
 	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
-	<string>$(TeamIdentifierPrefix)com.mentalfaculty.iCloudCoreDataTester</string>
+	<string>$(TeamIdentifierPrefix)com.mentalfaculty.${PRODUCT_NAME:rfc1034identifier}</string>
 </dict>
 </plist>
