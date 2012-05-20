@@ -14,6 +14,15 @@ static NSString * const UsingCloudStorageDefault = @"UsingCloudStorageDefault";
 #warning Fill in a valid team identifier
 static NSString * const TeamIdentifier = @"XXXXXXXXXX";
 
+
+@interface AppDelegate ()
+
+@property (nonatomic, readonly) NSURL *localStoreURL;
+@property (nonatomic, readonly) NSURL *cloudStoreURL;
+@property (nonatomic, readonly) NSURL *applicationFilesDirectory;
+
+@end
+
 @implementation AppDelegate {
     IBOutlet NSArrayController *notesController;
     IBOutlet NSArrayController *schedulesController;
@@ -25,11 +34,29 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
 @synthesize managedObjectModel = __managedObjectModel;
 @synthesize managedObjectContext = __managedObjectContext;
 
+#pragma mark Initialization
+
 -(id)init
 {
     self = [super init];
     stackIsSetup = YES;
     return self;
+}
+
+#pragma mark File Locations
+
+-(NSURL *)localStoreURL
+{
+    return [self.applicationFilesDirectory URLByAppendingPathComponent:@"iCloudCoreDataTester.storedata"];
+}
+
+-(NSURL *)cloudStoreURL
+{
+    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
+    NSString *ubiquityId = [NSString stringWithFormat:@"%@.%@", TeamIdentifier, bundleId];
+    NSURL *ubiquitousURL = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:ubiquityId];
+    NSURL *storeURL = [ubiquitousURL URLByAppendingPathComponent:@"MainStore"];
+    return storeURL;
 }
 
 -(NSURL *)applicationFilesDirectory
@@ -39,6 +66,8 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
     return [appSupportURL URLByAppendingPathComponent:bundleId];
 }
+
+#pragma mark Adding/Removing Objects
 
 -(IBAction)addNote:(id)sender
 {
@@ -75,6 +104,8 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     }
 }
 
+#pragma mark Core Data Stack
+
 -(IBAction)tearDownCoreDataStack:(id)sender
 {
     if ( !stackIsSetup ) return;
@@ -100,47 +131,7 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     [[NSFileManager defaultManager] removeItemAtURL:[self applicationFilesDirectory] error:NULL];
 }
 
--(IBAction)startSyncing:(id)sender
-{
-    [self tearDownCoreDataStack:self];
-    
-    if ( [[NSFileManager defaultManager] fileExistsAtPath:[[self cloudStoreURL] path]] ) {
-        // Already cloud data present, so replace local data with it
-        [self removeLocalFiles:self];
-    }
-    
-    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:UsingCloudStorageDefault];
-    [self setupCoreDataStack:self];
-}
-
--(NSURL *)cloudStoreURL
-{
-    NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
-    NSString *ubiquityId = [NSString stringWithFormat:@"%@.%@", TeamIdentifier, bundleId];
-    NSURL *ubiquitousURL = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:ubiquityId];
-    NSURL *storeURL = [ubiquitousURL URLByAppendingPathComponent:@"MainStore"];
-    return storeURL;
-}
-
--(IBAction)removeCloudFiles:(id)sender
-{
-    [self tearDownCoreDataStack:self];
-    
-    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:UsingCloudStorageDefault];
-
-    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
-    NSURL *storeURL = self.cloudStoreURL;
-    if ( !storeURL ) return;
-    [coordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
-        [[NSFileManager defaultManager] removeItemAtURL:newURL error:nil];
-    }];
-}
-
-- (void)applicationDidFinishLaunching:(NSNotification *)aNotification
-{
-}
-
-- (NSManagedObjectModel *)managedObjectModel
+-(NSManagedObjectModel *)managedObjectModel
 {
     if (__managedObjectModel) {
         return __managedObjectModel;
@@ -151,7 +142,7 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     return __managedObjectModel;
 }
 
-- (NSPersistentStoreCoordinator *)persistentStoreCoordinator
+-(NSPersistentStoreCoordinator *)persistentStoreCoordinator
 {
     if (__persistentStoreCoordinator) {
         return __persistentStoreCoordinator;
@@ -166,14 +157,17 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     NSURL *storeURL = self.cloudStoreURL;
     BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:UsingCloudStorageDefault];
     usingCloudStorage &= storeURL != nil;
-    NSDictionary *options = [NSDictionary dictionary];
+    NSMutableDictionary *options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                    (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
+                                    (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption, 
+                                    nil];
     if ( usingCloudStorage ) {
-        options = [NSDictionary dictionaryWithObjectsAndKeys:
-          MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
-          storeURL, NSPersistentStoreUbiquitousContentURLKey, 
-          nil];
+        [options addEntriesFromDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
+                                           MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
+                                           storeURL, NSPersistentStoreUbiquitousContentURLKey, 
+                                           nil]];
     }
-
+    
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSURL *applicationFilesDirectory = [self applicationFilesDirectory];
@@ -204,7 +198,7 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
         }
     }
     
-    NSURL *url = [applicationFilesDirectory URLByAppendingPathComponent:@"iCloudCoreDataTester.storedata"];
+    NSURL *url = self.localStoreURL; 
     NSPersistentStoreCoordinator *coordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:mom];
     if (![coordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:url options:options error:&error]) {
         [[NSApplication sharedApplication] presentError:error];
@@ -216,6 +210,85 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(persistentStoreCoordinatorDidMergeCloudChanges:) name:NSPersistentStoreDidImportUbiquitousContentChangesNotification object:coordinator];
     
     return __persistentStoreCoordinator;
+}
+
+#pragma mark iCloud
+
+-(IBAction)startSyncing:(id)sender
+{
+    [self tearDownCoreDataStack:self];
+    
+    BOOL migrateDataFromCloud = [[NSFileManager defaultManager] fileExistsAtPath:self.cloudStoreURL.path];
+    if ( migrateDataFromCloud ) {
+        // Already cloud data present, so replace local data with it
+        [self removeLocalFiles:self];
+    }
+    else {
+        // No cloud data, so migrate local data to the cloud
+        [self migrateStoreToCloud];
+    }
+    
+    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:UsingCloudStorageDefault];
+    [self setupCoreDataStack:self];
+}
+
+-(void)migrateStoreToCloud
+{
+    NSError *error;
+    NSURL *storeURL = self.localStoreURL;
+    NSURL *oldStoreURL = [[self applicationFilesDirectory] URLByAppendingPathComponent:@"OldStore"];
+    
+    // If there is no local store, no need to migrate
+    if ( ![[NSFileManager defaultManager] fileExistsAtPath:storeURL.path] ) return;
+        
+    // Remove any existing old store file left over from a previous migration
+    [[NSFileManager defaultManager] removeItemAtURL:oldStoreURL error:NULL];
+    
+    // Move existing local store aside
+    if ( ![[NSFileManager defaultManager] moveItemAtURL:storeURL toURL:oldStoreURL error:&error] ) {
+        [[NSApplication sharedApplication] presentError:error];
+        return;
+    }
+    
+    // Options for new cloud store
+    NSDictionary *localOnlyOptions = [NSDictionary dictionaryWithObjectsAndKeys:
+        (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
+        (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption, 
+        nil];
+    NSDictionary *cloudOptions = [NSDictionary dictionaryWithObjectsAndKeys:
+        (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
+        (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption, 
+        MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
+        self.cloudStoreURL, NSPersistentStoreUbiquitousContentURLKey, 
+        nil];
+    NSPersistentStoreCoordinator *coordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.managedObjectModel];
+    id oldStore = [coordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:oldStoreURL options:localOnlyOptions error:&error];
+    if ( !oldStore ) {
+        [[NSApplication sharedApplication] presentError:error];
+        return;
+    }
+        
+    // Migrate existing (old) store to new store
+    if ( ![coordinator migratePersistentStore:oldStore toURL:storeURL options:cloudOptions withType:NSSQLiteStoreType error:&error] ) {
+        [[NSApplication sharedApplication] presentError:error];
+    }
+    else {
+        [[NSFileManager defaultManager] removeItemAtURL:oldStoreURL error:NULL];
+    }
+}
+
+-(IBAction)removeCloudFiles:(id)sender
+{
+    [self tearDownCoreDataStack:self];
+    
+    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:UsingCloudStorageDefault];
+
+    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+    NSURL *storeURL = self.cloudStoreURL;
+    if ( !storeURL ) return;
+    [coordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
+        [[NSFileManager defaultManager] removeItemAtURL:newURL error:nil];
+    }];
 }
 
 -(void)persistentStoreCoordinatorDidMergeCloudChanges:(NSNotification *)notification
@@ -231,9 +304,7 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     }];
 }
 
-
-// Returns the managed object context for the application (which is already bound to the persistent store coordinator for the application.) 
-- (NSManagedObjectContext *)managedObjectContext
+-(NSManagedObjectContext *)managedObjectContext
 {
     if ( !stackIsSetup ) return nil;
     
@@ -257,7 +328,9 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     return __managedObjectContext;
 }
 
-- (IBAction)saveAction:(id)sender
+#pragma mark Saving and Quitting
+
+-(IBAction)saveAction:(id)sender
 {    
     [self.managedObjectContext performBlock:^{
         if (![[self managedObjectContext] commitEditing]) {
@@ -271,7 +344,7 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     }];
 }
 
-- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
+-(NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender
 {    
     if (!__managedObjectContext) {
         return NSTerminateNow;

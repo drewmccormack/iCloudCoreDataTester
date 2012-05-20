@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model name="" userDefinedModelVersionIdentifier="" type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1171" systemVersion="11D50b" minimumToolsVersion="Automatic" macOSVersion="Automatic" iOSVersion="Automatic">
+<model name="" userDefinedModelVersionIdentifier="" type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1171" systemVersion="11D50" minimumToolsVersion="Automatic" macOSVersion="Automatic" iOSVersion="Automatic">
     <entity name="AbstractSchedule" isAbstract="YES" syncable="YES">
         <relationship name="permutation" minCount="1" maxCount="1" deletionRule="Nullify" destinationEntity="Permutation" inverseName="schedule" inverseEntity="Permutation" spotlightIndexingEnabled="YES" syncable="YES"/>
     </entity>
@@ -30,18 +30,18 @@
         <relationship name="permutations" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Permutation" inverseName="note" inverseEntity="Permutation" syncable="YES"/>
     </entity>
     <entity name="Permutation" syncable="YES">
-        <relationship name="facet" optional="YES" minCount="1" maxCount="1" deletionRule="Nullify" destinationEntity="Facet" inverseName="permutations" inverseEntity="Facet" syncable="YES"/>
-        <relationship name="note" optional="YES" minCount="1" maxCount="1" deletionRule="Nullify" destinationEntity="Note" inverseName="permutations" inverseEntity="Note" syncable="YES"/>
+        <relationship name="facet" minCount="1" maxCount="1" deletionRule="Nullify" destinationEntity="Facet" inverseName="permutations" inverseEntity="Facet" syncable="YES"/>
+        <relationship name="note" minCount="1" maxCount="1" deletionRule="Nullify" destinationEntity="Note" inverseName="permutations" inverseEntity="Note" syncable="YES"/>
         <relationship name="schedule" optional="YES" minCount="1" maxCount="1" deletionRule="Cascade" destinationEntity="AbstractSchedule" inverseName="permutation" inverseEntity="AbstractSchedule" syncable="YES"/>
     </entity>
     <elements>
         <element name="AbstractSchedule" positionX="-10098" positionY="-7371" width="128" height="60"/>
         <element name="ChildSchedule" positionX="-10100" positionY="-7251" width="128" height="60"/>
-        <element name="Facet" positionX="-10730" positionY="-7167" width="128" height="75"/>
-        <element name="Note" positionX="-10710" positionY="-7410" width="128" height="90"/>
-        <element name="Permutation" positionX="-10424" positionY="-7371" width="128" height="90"/>
         <element name="ExtraChildSchedule1" positionX="-9936" positionY="-7254" width="128" height="75"/>
         <element name="ExtraChildSchedule2" positionX="-9765" positionY="-7260" width="128" height="105"/>
         <element name="ExtraChildSchedule3" positionX="-10280" positionY="-7245" width="128" height="75"/>
+        <element name="Facet" positionX="-10730" positionY="-7167" width="128" height="75"/>
+        <element name="Note" positionX="-10710" positionY="-7410" width="128" height="90"/>
+        <element name="Permutation" positionX="-10424" positionY="-7371" width="128" height="90"/>
     </elements>
 </model>
