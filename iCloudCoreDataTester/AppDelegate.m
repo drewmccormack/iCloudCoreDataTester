@@ -79,14 +79,17 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     id newPermutation = [NSEntityDescription insertNewObjectForEntityForName:@"Permutation" inManagedObjectContext:self.managedObjectContext];
     [newPermutation setValue:newFacet forKey:@"facet"];
     [newPermutation setValue:newNote forKey:@"note"];
+    id newSchedule = [NSEntityDescription insertNewObjectForEntityForName:@"ChildSchedule" inManagedObjectContext:self.managedObjectContext];
+    [newPermutation setValue:newSchedule forKey:@"schedule"];
 }
 
--(IBAction)addSchedule:(id)sender
+-(IBAction)changeSchedule:(id)sender
 {
     id note = [[notesController selectedObjects] lastObject];
     if ( !note || notesController.selectedObjects.count > 1 ) return;
     [self.managedObjectContext processPendingChanges];
     id newSchedule = [NSEntityDescription insertNewObjectForEntityForName:@"ChildSchedule" inManagedObjectContext:self.managedObjectContext];
+    [newSchedule setValue:[[NSProcessInfo processInfo] globallyUniqueString] forKey:@"title"];
     id permutation = [[note valueForKey:@"permutations"] anyObject];
     id existingSchedule = [permutation valueForKey:@"schedule"];
     if ( existingSchedule ) [self.managedObjectContext deleteObject:existingSchedule];
@@ -94,23 +97,18 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     [self.managedObjectContext processPendingChanges];
 }
 
--(IBAction)removeSchedule:(id)sender
-{
-    NSArray *permutations = [schedulesController selectedObjects];
-    for ( id perm in permutations ) {
-        id schedule = [perm valueForKey:@"schedule"];
-        [perm setValue:nil forKey:@"note"];
-        [self.managedObjectContext deleteObject:schedule];
-    }
-}
-
 #pragma mark Core Data Stack
 
 -(IBAction)tearDownCoreDataStack:(id)sender
 {
     if ( !stackIsSetup ) return;
+    
+    NSError *error;
+    if ( ![self.managedObjectContext save:&error] ) {
+        [NSApp presentError:error];
+    }
     stackIsSetup = NO;
-    [self.managedObjectContext save:NULL];
+    
     [self.managedObjectContext reset];
     self.managedObjectContext = nil;
     self.managedObjectModel = nil;
@@ -216,6 +214,11 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
 
 -(IBAction)startSyncing:(id)sender
 {
+    if ( !self.cloudStoreURL ) {
+        NSLog(@"iCloud not available. Ubiq URL was nil");
+        return;
+    }
+    
     [self tearDownCoreDataStack:self];
     
     BOOL migrateDataFromCloud = [[NSFileManager defaultManager] fileExistsAtPath:self.cloudStoreURL.path];
@@ -339,6 +342,7 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
         
         NSError *error = nil;
         if (![[self managedObjectContext] save:&error]) {
+            NSLog(@"Save error: %@", error);
             [[NSApplication sharedApplication] presentError:error];
         }
     }];
