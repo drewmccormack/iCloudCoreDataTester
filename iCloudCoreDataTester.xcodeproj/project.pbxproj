@@ -91,15 +91,15 @@
 		070CF2C21512406A00D0C8CA /* iCloudCoreDataTester */ = {
 			isa = PBXGroup;
 			children = (
+				070CF2CE1512406A00D0C8CA /* AppDelegate.h */,
+				070CF2CF1512406A00D0C8CA /* AppDelegate.m */,
 				07AB01D9157B555800B24E3B /* NSURLExtensions.h */,
 				07AB01DA157B555800B24E3B /* NSURLExtensions.m */,
 				07AB01D5157B54C300B24E3B /* MCCloudResetSentinel.h */,
 				07AB01D6157B54C300B24E3B /* MCCloudResetSentinel.m */,
-				072661DE15135B800015E115 /* iCloudCoreDataTester.entitlements */,
-				070CF2CE1512406A00D0C8CA /* AppDelegate.h */,
-				070CF2CF1512406A00D0C8CA /* AppDelegate.m */,
 				070CF2D11512406A00D0C8CA /* MainMenu.xib */,
 				070CF2D41512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodeld */,
+				072661DE15135B800015E115 /* iCloudCoreDataTester.entitlements */,
 				070CF2C31512406A00D0C8CA /* Supporting Files */,
 			);
 			path = iCloudCoreDataTester;

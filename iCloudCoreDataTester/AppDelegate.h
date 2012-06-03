@@ -1,7 +1,8 @@
 
 #import <Cocoa/Cocoa.h>
+#import "MCCloudResetSentinel.h"
 
-@interface AppDelegate : NSObject <NSApplicationDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, MCCloudResetSentinelDelegate>
 
 @property (assign) IBOutlet NSWindow *window;
 
