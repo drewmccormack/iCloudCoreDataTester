@@ -125,6 +125,8 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
 -(IBAction)removeLocalFiles:(id)sender
 {
     [self tearDownCoreDataStack:self];
+    [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
+    [[NSUserDefaults standardUserDefaults] synchronize];
     [[NSFileManager defaultManager] removeItemAtURL:[self applicationFilesDirectory] error:NULL];
 }
 
