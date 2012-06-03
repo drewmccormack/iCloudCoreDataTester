@@ -1,10 +1,3 @@
-//
-//  AppDelegate.m
-//  iCloudCoreDataTester
-//
-//  Created by Drew McCormack on 15/03/12.
-//  Copyright (c) 2012 The Mental Faculty. All rights reserved.
-//
 
 #import "AppDelegate.h"
 
