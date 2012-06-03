@@ -16,6 +16,7 @@
 		070CF2D61512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 070CF2D41512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodeld */; };
 		07AB01D7157B54C300B24E3B /* MCCloudResetSentinel.m in Sources */ = {isa = PBXBuildFile; fileRef = 07AB01D6157B54C300B24E3B /* MCCloudResetSentinel.m */; };
 		07AB01DB157B555800B24E3B /* NSURLExtensions.m in Sources */ = {isa = PBXBuildFile; fileRef = 07AB01DA157B555800B24E3B /* NSURLExtensions.m */; };
+		07D24124157BA4CE00808BF6 /* License.txt in Resources */ = {isa = PBXBuildFile; fileRef = 07D24123157BA4CE00808BF6 /* License.txt */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 		07AB01D6157B54C300B24E3B /* MCCloudResetSentinel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MCCloudResetSentinel.m; sourceTree = "<group>"; };
 		07AB01D9157B555800B24E3B /* NSURLExtensions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NSURLExtensions.h; sourceTree = "<group>"; };
 		07AB01DA157B555800B24E3B /* NSURLExtensions.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = NSURLExtensions.m; sourceTree = "<group>"; };
+		07D24123157BA4CE00808BF6 /* License.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = License.txt; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +93,7 @@
 		070CF2C21512406A00D0C8CA /* iCloudCoreDataTester */ = {
 			isa = PBXGroup;
 			children = (
+				07D24123157BA4CE00808BF6 /* License.txt */,
 				070CF2CE1512406A00D0C8CA /* AppDelegate.h */,
 				070CF2CF1512406A00D0C8CA /* AppDelegate.m */,
 				07AB01D9157B555800B24E3B /* NSURLExtensions.h */,
@@ -171,6 +174,7 @@
 				070CF2C71512406A00D0C8CA /* InfoPlist.strings in Resources */,
 				070CF2CD1512406A00D0C8CA /* Credits.rtf in Resources */,
 				070CF2D31512406A00D0C8CA /* MainMenu.xib in Resources */,
+				07D24124157BA4CE00808BF6 /* License.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
