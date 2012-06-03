@@ -2,10 +2,10 @@
 #import "AppDelegate.h"
 
 static NSString * const MCCloudMainStoreFileName = @"com.mentalfaculty.icloudcoredatatester.1";
-static NSString * const MCUsingCloudStorageDefault = @"UsingCloudStorageDefault";
+static NSString * const MCUsingCloudStorageDefault = @"MCUsingCloudStorageDefault";
 
 #warning Fill in a valid team identifier
-static NSString * const TeamIdentifier = @"XXXXXXXXXX";
+static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 
 @interface AppDelegate ()
@@ -13,6 +13,10 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
 @property (nonatomic, readonly) NSURL *localStoreURL;
 @property (nonatomic, readonly) NSURL *cloudStoreURL;
 @property (nonatomic, readonly) NSURL *applicationFilesDirectory;
+
+@property (readwrite, strong, nonatomic) NSPersistentStoreCoordinator *persistentStoreCoordinator;
+@property (readwrite, strong, nonatomic) NSManagedObjectModel *managedObjectModel;
+@property (readwrite, strong, nonatomic) NSManagedObjectContext *managedObjectContext;
 
 @end
 
@@ -29,6 +33,12 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
 @synthesize managedObjectContext = __managedObjectContext;
 
 #pragma mark Initialization
+
++(void)initialize
+{
+    [[NSUserDefaults standardUserDefaults] registerDefaults:
+        [NSDictionary dictionaryWithObject:(id)kCFBooleanFalse forKey:MCUsingCloudStorageDefault]];
+}
 
 -(id)init
 {
@@ -118,8 +128,16 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
     if ( stackIsSetup ) return;
     stackIsSetup = YES;
     
-    [self willChangeValueForKey:@"managedObjectContext"];
-    [self didChangeValueForKey:@"managedObjectContext"];
+    [self makePersistentStoreCoordinator];
+    __weak AppDelegate *weakSelf = self;
+    [self addStoreToPersistentStoreCoordinator:^(BOOL success, NSError *error) {
+        if ( !success ) {
+            [[NSApplication sharedApplication] presentError:error];
+        }
+        else {
+            [weakSelf makeManagedObjectContext];
+        }
+    }];
 }
 
 -(IBAction)removeLocalFiles:(id)sender
@@ -132,47 +150,18 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
 
 -(NSManagedObjectModel *)managedObjectModel
 {
-    if (__managedObjectModel) {
-        return __managedObjectModel;
-    }
-	
+    if (__managedObjectModel) return __managedObjectModel;	
     NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"iCloudCoreDataTester" withExtension:@"momd"];
     __managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:modelURL];
     return __managedObjectModel;
 }
 
--(NSPersistentStoreCoordinator *)persistentStoreCoordinator
+-(void)makePersistentStoreCoordinator
 {
-    if (__persistentStoreCoordinator) {
-        return __persistentStoreCoordinator;
-    }    
-    
     NSManagedObjectModel *mom = [self managedObjectModel];
     if (!mom) {
         NSLog(@"%@:%@ No model to generate a store from", [self class], NSStringFromSelector(_cmd));
-        return nil;
-    }
-    
-    // Use cloud storage if iCloud is enabled, and the user default is set to YES.
-    NSURL *storeURL = self.cloudStoreURL;
-    if ( storeURL == nil ) {
-        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-    }
-    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
-    
-    // Basic options
-    NSMutableDictionary *options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                    (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
-                                    (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption, 
-                                    nil];
-    
-    // iCloud options
-    if ( usingCloudStorage ) {
-        [options addEntriesFromDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
-                                           MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
-                                           storeURL, NSPersistentStoreUbiquitousContentURLKey, 
-                                           nil]];
+        return;
     }
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -188,7 +177,7 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
         }
         if (!ok) {
             [[NSApplication sharedApplication] presentError:error];
-            return nil;
+            return;
         }
     } else {
         if (![[properties objectForKey:NSURLIsDirectoryKey] boolValue]) {
@@ -199,37 +188,76 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
             error = [NSError errorWithDomain:@"MCErrorDomain" code:101 userInfo:dict];
             
             [[NSApplication sharedApplication] presentError:error];
-            return nil;
+            return;
         }
     }
     
-    NSURL *url = self.localStoreURL; 
     NSPersistentStoreCoordinator *coordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:mom];
-    __persistentStoreCoordinator = coordinator;
+    self.persistentStoreCoordinator = coordinator;
     
     // Register as observer for iCloud merge notifications
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(persistentStoreCoordinatorDidMergeCloudChanges:) name:NSPersistentStoreDidImportUbiquitousContentChangesNotification object:coordinator];
+}
+
+-(void)addStoreToPersistentStoreCoordinator:(void (^)(BOOL success, NSError *error))completionBlock
+{
+    if ( completionBlock ) completionBlock = [completionBlock copy];
+    dispatch_queue_t completionQueue = dispatch_get_current_queue();
+    dispatch_retain(completionQueue);
+    
+    // Use cloud storage if iCloud is enabled, and the user default is set to YES.
+    NSURL *storeURL = self.cloudStoreURL;
+    NSURL *url = self.localStoreURL; 
+    if ( storeURL == nil ) {
+        [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
     
     // Setup a sentinel
+    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
     if ( usingCloudStorage ) {
         sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:usingCloudStorage];
         sentinel.delegate = self;
     }
     
+    // Basic options
+    NSMutableDictionary *options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+        (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
+        (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption, 
+        nil];
+    
+    // iCloud options
+    if ( usingCloudStorage ) {
+        [options addEntriesFromDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
+            MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
+            storeURL, NSPersistentStoreUbiquitousContentURLKey, 
+            nil]];
+    }
+    
     // Add store on background queue. With cloud options enabled, it can take a while.
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
         NSError *error;
-        [coordinator lock];
-        id store = [coordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:url options:options error:&error];
-        [coordinator unlock];
-        
-        if ( !store ) {
-            [[NSApplication sharedApplication] presentError:error];
-        }
+        [self.persistentStoreCoordinator lock];
+        id store = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:url options:options error:&error];
+        [self.persistentStoreCoordinator unlock];
+    
+        dispatch_async(completionQueue, ^{
+            completionBlock(nil != store, error);
+            dispatch_release(completionQueue);
+        });
     });
-        
-    return __persistentStoreCoordinator;
+    
+
+}
+
+-(void)makeManagedObjectContext
+{
+    NSPersistentStoreCoordinator *coordinator = [self persistentStoreCoordinator];
+    NSManagedObjectContext *context = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+    context.persistentStoreCoordinator = coordinator;
+    context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
+    self.managedObjectContext = context;
 }
 
 #pragma mark iCloud
@@ -349,27 +377,6 @@ static NSString * const TeamIdentifier = @"XXXXXXXXXX";
         [self.managedObjectContext mergeChangesFromContextDidSaveNotification:notification]; 
         [self saveAction:self];
     }];
-}
-
--(NSManagedObjectContext *)managedObjectContext
-{
-    if ( !stackIsSetup ) return nil;
-    if (__managedObjectContext) return __managedObjectContext;
-    
-    NSPersistentStoreCoordinator *coordinator = [self persistentStoreCoordinator];
-    if (!coordinator) {
-        NSMutableDictionary *dict = [NSMutableDictionary dictionary];
-        [dict setValue:@"Failed to initialize the store" forKey:NSLocalizedDescriptionKey];
-        [dict setValue:@"There was an error building up the data file." forKey:NSLocalizedFailureReasonErrorKey];
-        NSError *error = [NSError errorWithDomain:@"MCErrorDomain" code:9999 userInfo:dict];
-        [[NSApplication sharedApplication] presentError:error];
-        return nil;
-    }
-    __managedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-    [__managedObjectContext setPersistentStoreCoordinator:coordinator];
-    __managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
-
-    return __managedObjectContext;
 }
 
 #pragma mark Cloud Sentinel Delegate Methods
