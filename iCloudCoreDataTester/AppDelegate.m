@@ -181,10 +181,12 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 -(IBAction)removeLocalFiles:(id)sender
 {
+    [self saveAction:self];
     [self tearDownCoreDataStack:self];
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
     [[NSUserDefaults standardUserDefaults] synchronize];
     [[NSFileManager defaultManager] removeItemAtURL:[self applicationFilesDirectory] error:NULL];
+    [self setupCoreDataStack:self];
 }
 
 -(NSManagedObjectModel *)managedObjectModel
@@ -428,6 +430,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     [self tearDownCoreDataStack:self];
     
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 
     NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
     NSURL *storeURL = self.cloudStoreURL;
@@ -435,6 +438,8 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     [coordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
         [[NSFileManager defaultManager] removeItemAtURL:newURL error:NULL];
     }];
+    
+    [self setupCoreDataStack:self];
 }
 
 -(void)persistentStoreCoordinatorDidMergeCloudChanges:(NSNotification *)notification

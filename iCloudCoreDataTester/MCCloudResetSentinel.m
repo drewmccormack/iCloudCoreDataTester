@@ -17,6 +17,8 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 
 @implementation MCCloudResetSentinel {
     NSMetadataQuery *devicesListMetadataQuery;
+    BOOL haveInformedDelegateOfReset;
+    NSOperationQueue *filePresenterQueue;
 }
 
 @synthesize cloudSyncEnabled;
@@ -27,6 +29,9 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 {
     self = [super init];
     if ( self ) {
+        haveInformedDelegateOfReset = NO;
+        filePresenterQueue = [[NSOperationQueue alloc] init];
+        
         cloudStoreURL = [newURL copy];
         cloudSyncEnabled = usingStorage;
         if ( !cloudStoreURL ) [NSException raise:MCSentinelException format:@"Attempt to init a sentinel with cloudStoreURL nil"];
@@ -36,7 +41,10 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
         devicesListMetadataQuery.searchScopes = [NSArray arrayWithObject:NSMetadataQueryUbiquitousDataScope];
         devicesListMetadataQuery.predicate = [NSPredicate predicateWithFormat:@"%K like %@", NSMetadataItemFSNameKey, MCSyncingDevicesListFilename];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(devicesListDidUpdate:) name:NSMetadataQueryDidUpdateNotification object:devicesListMetadataQuery];
-        [devicesListMetadataQuery startQuery];
+        if ( ![devicesListMetadataQuery startQuery] ) NSLog(@"Failed to start devices list NSMetadataQuery");
+        
+        // Register as file presenter
+        [NSFileCoordinator addFilePresenter:self];
     }
     return self;
 }
@@ -46,10 +54,38 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
     [self stopMonitoringDevicesList];
 }
 
+#pragma mark File Presenter Protocol
+
+-(NSURL *)presentedItemURL
+{
+    return self.syncedDevicesListURL;
+}
+
+-(NSOperationQueue *)presentedItemOperationQueue
+{
+    return filePresenterQueue;
+}
+
+-(void)presentedItemDidChange
+{
+    [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+        [self devicesListDidUpdate:nil];
+    }];
+}
+
+-(void)accommodatePresentedItemDeletionWithCompletionHandler:(void (^)(NSError *errorOrNil))completionHandler
+{
+    [[NSOperationQueue mainQueue] addOperationWithBlock:^{
+        [self devicesListDidUpdate:nil];
+    }];
+    completionHandler(nil);
+}
+
 #pragma mark Monitoring
 
 -(void)stopMonitoringDevicesList
 {
+    [NSFileCoordinator removeFilePresenter:self];
     [devicesListMetadataQuery disableUpdates];
     [devicesListMetadataQuery stopQuery];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
@@ -60,8 +96,10 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 
 -(void)devicesListDidUpdate:(NSNotification *)notif
 {
+    if ( haveInformedDelegateOfReset ) return;
     [self checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
         if ( !deviceIsPresent && cloudSyncEnabled ) {
+            haveInformedDelegateOfReset = YES;
             [delegate cloudResetSentinelDidDetectReset:self];
             [[NSNotificationCenter defaultCenter] postNotificationName:MCCloudResetSentinelDidDetectResetNotification object:self userInfo:nil];
         }
@@ -84,7 +122,7 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
         
     NSURL *url = self.syncedDevicesListURL;
     [url syncWithCloud:^(BOOL succeeded, NSError *error) {        
-        NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+        NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:self];
         [coordinator coordinateReadingItemAtURL:url options:0 error:NULL byAccessor:^(NSURL *readURL) {
             NSArray *devices = [NSArray arrayWithContentsOfURL:readURL];
             NSString *deviceId = [self.class deviceIdentifier];
@@ -132,7 +170,7 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
             
             __block BOOL updated = NO;
             __block NSMutableArray *devices = nil;
-            NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+            NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:self];
             [coordinator coordinateReadingItemAtURL:url options:0 error:NULL byAccessor:^(NSURL *readURL) {
                 devices = [NSMutableArray arrayWithContentsOfURL:readURL];
                 if ( !devices ) devices = [NSMutableArray array]; 

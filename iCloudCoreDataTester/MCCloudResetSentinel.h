@@ -36,7 +36,7 @@ extern NSString * const MCSentinelException;
 
 @end
 
-@interface MCCloudResetSentinel : NSObject
+@interface MCCloudResetSentinel : NSObject <NSFilePresenter>
 
 @property (nonatomic, readonly, assign) BOOL cloudSyncEnabled;
 @property (nonatomic, readonly, strong) NSURL *cloudStoreURL;
