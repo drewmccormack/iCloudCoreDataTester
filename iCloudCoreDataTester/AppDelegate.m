@@ -60,20 +60,14 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     return self;
 }
 
-#pragma mark Launching
+#pragma mark Launch
 
 -(void)applicationDidFinishLaunching:(NSNotification *)notification
 {
-    // Use a temporary sentinel to determine if a reset of cloud data has occurred since last launch
-    if ( !self.cloudStoreURL ) [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
-    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
-    if ( usingCloudStorage ) {
-        MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:YES];
-        [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
-            if ( !deviceIsPresent ) [self tearDownAfterCloudReset];
-            [self setupCoreDataStack:self];
-        }];
-    }
+    [self checkIfCloudDataHasBeenReset:^(BOOL hasBeenReset) {
+        if ( hasBeenReset ) [self disableCloudAfterResetAndWarnUser];
+        [self setupCoreDataStack:self];
+    }];
 }
 
 #pragma mark File Locations
@@ -159,9 +153,9 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 {
     if ( self.stackIsSetup || self.stackIsLoading ) return;
     self.stackIsLoading = YES;
-    
-    [self makePersistentStoreCoordinator];
         
+    [self makePersistentStoreCoordinator];
+    
     __weak AppDelegate *weakSelf = self;
     [self addStoreToPersistentStoreCoordinator:^(BOOL success, NSError *error) {
         if ( !success ) {
@@ -301,6 +295,38 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 #pragma mark iCloud
 
+-(void)checkIfCloudDataHasBeenReset:(void (^)(BOOL hasBeenReset))completionBlock
+{
+    dispatch_queue_t completionQueue = dispatch_get_current_queue();
+    dispatch_retain(completionQueue);
+    
+    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
+    if ( usingCloudStorage && !self.cloudStoreURL ) {
+        dispatch_async(completionQueue, ^{
+            completionBlock(YES);
+            dispatch_release(completionQueue);
+        });
+        return;
+    }
+    
+    // Use a temporary sentinel to determine if a reset of cloud data has occurred
+    MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:usingCloudStorage];
+    if ( usingCloudStorage ) {
+        [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
+            dispatch_async(completionQueue, ^{
+                completionBlock(!deviceIsPresent);
+                dispatch_release(completionQueue);
+            });
+        }];
+    }
+    else {
+        dispatch_async(completionQueue, ^{
+            completionBlock(NO);
+            dispatch_release(completionQueue);
+        });
+    }
+}
+
 -(IBAction)startSyncing:(id)sender
 {
     if ( !self.cloudStoreURL ) {
@@ -425,19 +451,18 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 {
     BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
     if ( !usingCloudStorage ) return;
-    [self tearDownAfterCloudReset];
+    [self tearDownCoreDataStack:self];
+    [self disableCloudAfterResetAndWarnUser];
     [self setupCoreDataStack:self];
 }
 
--(void)tearDownAfterCloudReset
+-(void)disableCloudAfterResetAndWarnUser
 {
-    [self tearDownCoreDataStack:self];
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
+    [[NSUserDefaults standardUserDefaults] synchronize];
     
     NSAlert *alert = [NSAlert alertWithMessageText:@"iCloud syncing has been disabled" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"The iCloud data of this app has been removed or tampered with."];
     [alert runModal];
-    
-    [self setupCoreDataStack:self];
 }
 
 #pragma mark Saving and Quitting
