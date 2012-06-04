@@ -7,6 +7,8 @@
 @property (assign) IBOutlet NSWindow *window;
 
 @property (readonly, strong, nonatomic) NSManagedObjectContext *managedObjectContext;
+@property (readonly, assign, nonatomic) BOOL stackIsSetup;
+@property (readonly, assign, nonatomic) BOOL stackIsLoading;
 
 - (IBAction)saveAction:(id)sender;
 

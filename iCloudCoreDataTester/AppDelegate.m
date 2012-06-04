@@ -17,20 +17,25 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 @property (readwrite, strong, nonatomic) NSPersistentStoreCoordinator *persistentStoreCoordinator;
 @property (readwrite, strong, nonatomic) NSManagedObjectModel *managedObjectModel;
 @property (readwrite, strong, nonatomic) NSManagedObjectContext *managedObjectContext;
+@property (readwrite, assign, nonatomic) BOOL stackIsSetup;
+@property (readwrite, assign, nonatomic) BOOL stackIsLoading;
 
 @end
+
 
 @implementation AppDelegate {
     IBOutlet NSArrayController *notesController;
     IBOutlet NSArrayController *schedulesController;
     MCCloudResetSentinel *sentinel;
     BOOL stackIsSetup;
+    BOOL stackIsLoading;
 }
 
 @synthesize window = _window;
 @synthesize persistentStoreCoordinator = __persistentStoreCoordinator;
 @synthesize managedObjectModel = __managedObjectModel;
 @synthesize managedObjectContext = __managedObjectContext;
+@synthesize stackIsSetup, stackIsLoading;
 
 #pragma mark Initialization
 
@@ -43,8 +48,32 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 -(id)init
 {
     self = [super init];
-    stackIsSetup = YES;
+    if ( self ) {
+        stackIsSetup = NO;
+        stackIsLoading = NO;
+        
+        // Setup an 'empty' temporary stack, just so there is a MOC for the bound views to bind to.
+        self.persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.managedObjectModel];
+        self.managedObjectContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+        self.managedObjectContext.persistentStoreCoordinator = self.persistentStoreCoordinator;
+    }
     return self;
+}
+
+#pragma mark Launching
+
+-(void)applicationDidFinishLaunching:(NSNotification *)notification
+{
+    // Use a temporary sentinel to determine if a reset of cloud data has occurred since last launch
+    if ( !self.cloudStoreURL ) [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
+    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
+    if ( usingCloudStorage ) {
+        MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:YES];
+        [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
+            if ( !deviceIsPresent ) [self tearDownAfterCloudReset];
+            [self setupCoreDataStack:self];
+        }];
+    }
 }
 
 #pragma mark File Locations
@@ -75,6 +104,8 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 -(IBAction)addNote:(id)sender
 {
+    if ( !self.stackIsSetup ) [self setupCoreDataStack:self];
+    
     id newNote = [NSEntityDescription insertNewObjectForEntityForName:@"Note" inManagedObjectContext:self.managedObjectContext];
     
     id newFacet = [NSEntityDescription insertNewObjectForEntityForName:@"Facet" inManagedObjectContext:self.managedObjectContext];
@@ -110,33 +141,47 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 // If you want that, do it before calling this method.
 -(IBAction)tearDownCoreDataStack:(id)sender
 {
-    if ( !stackIsSetup ) return;
+    if ( !self.stackIsSetup && !self.stackIsLoading ) return;
     
     [sentinel stopMonitoringDevicesList];
     sentinel = nil;
-
-    stackIsSetup = NO;
     
     [self.managedObjectContext reset];
     self.managedObjectContext = nil;
     self.managedObjectModel = nil;
     self.persistentStoreCoordinator = nil;
+    
+    self.stackIsSetup = NO;
+    self.stackIsLoading = NO;
 }
 
 -(IBAction)setupCoreDataStack:(id)sender
 {
-    if ( stackIsSetup ) return;
-    stackIsSetup = YES;
+    if ( self.stackIsSetup || self.stackIsLoading ) return;
+    self.stackIsLoading = YES;
     
     [self makePersistentStoreCoordinator];
+        
     __weak AppDelegate *weakSelf = self;
     [self addStoreToPersistentStoreCoordinator:^(BOOL success, NSError *error) {
         if ( !success ) {
+            [weakSelf tearDownCoreDataStack:weakSelf];
             [[NSApplication sharedApplication] presentError:error];
         }
         else {
             [weakSelf makeManagedObjectContext];
+            
+            // Setup a sentinel
+            BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
+            if ( usingCloudStorage ) {
+                weakSelf->sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:weakSelf.cloudStoreURL cloudSyncEnabled:usingCloudStorage];
+                weakSelf->sentinel.delegate = self;
+                [weakSelf->sentinel updateDevicesList:NULL];
+            }
+            
+            weakSelf.stackIsSetup = YES;
         }
+        weakSelf.stackIsLoading = NO;
     }];
 }
 
@@ -214,13 +259,6 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
         [[NSUserDefaults standardUserDefaults] synchronize];
     }
     
-    // Setup a sentinel
-    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
-    if ( usingCloudStorage ) {
-        sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:usingCloudStorage];
-        sentinel.delegate = self;
-    }
-    
     // Basic options
     NSMutableDictionary *options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
         (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
@@ -228,6 +266,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
         nil];
     
     // iCloud options
+    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
     if ( usingCloudStorage ) {
         [options addEntriesFromDictionary:[NSDictionary dictionaryWithObjectsAndKeys:
             MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
@@ -236,27 +275,27 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     }
     
     // Add store on background queue. With cloud options enabled, it can take a while.
-    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+    dispatch_queue_t serialQueue = dispatch_queue_create("pscqueue", DISPATCH_QUEUE_SERIAL);
+    dispatch_async(serialQueue, ^{
         NSError *error;
         [self.persistentStoreCoordinator lock];
         id store = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:url options:options error:&error];
         [self.persistentStoreCoordinator unlock];
-    
+            
         dispatch_async(completionQueue, ^{
             completionBlock(nil != store, error);
             dispatch_release(completionQueue);
         });
+        
+        dispatch_release(serialQueue);
     });
-    
-
 }
 
 -(void)makeManagedObjectContext
 {
-    NSPersistentStoreCoordinator *coordinator = [self persistentStoreCoordinator];
     NSManagedObjectContext *context = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-    context.persistentStoreCoordinator = coordinator;
     context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
+    context.persistentStoreCoordinator = self.persistentStoreCoordinator;
     self.managedObjectContext = context;
 }
 
@@ -278,6 +317,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     // If the device never synced before, the user can choose to keep the 
     // local or the cloud data.
     MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:NO];
+    [tempSentinel stopMonitoringDevicesList];
     [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
         if ( deviceIsPresent ) {
             // Only choice is to move data to the cloud, replacing the existing cloud data.
@@ -383,17 +423,28 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 -(void)cloudResetSentinelDidDetectReset:(MCCloudResetSentinel *)sentinel
 {
+    BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
+    if ( !usingCloudStorage ) return;
+    [self tearDownAfterCloudReset];
+    [self setupCoreDataStack:self];
+}
+
+-(void)tearDownAfterCloudReset
+{
     [self tearDownCoreDataStack:self];
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
     
     NSAlert *alert = [NSAlert alertWithMessageText:@"iCloud syncing has been disabled" defaultButton:@"OK" alternateButton:nil otherButton:nil informativeTextWithFormat:@"The iCloud data of this app has been removed or tampered with."];
     [alert runModal];
+    
+    [self setupCoreDataStack:self];
 }
 
 #pragma mark Saving and Quitting
 
 -(IBAction)saveAction:(id)sender
 {    
+    if ( !self.stackIsSetup ) return;
     [self.managedObjectContext performBlockAndWait:^{
         if (![[self managedObjectContext] commitEditing]) {
             NSLog(@"%@:%@ unable to commit editing before saving", [self class], NSStringFromSelector(_cmd));
