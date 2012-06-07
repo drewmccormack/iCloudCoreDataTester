@@ -18,6 +18,7 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 @implementation MCCloudResetSentinel {
     NSMetadataQuery *devicesListMetadataQuery;
     BOOL haveInformedDelegateOfReset;
+    BOOL performingDeviceRegistrationCheck;
     NSOperationQueue *filePresenterQueue;
 }
 
@@ -30,6 +31,7 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
     self = [super init];
     if ( self ) {
         haveInformedDelegateOfReset = NO;
+        performingDeviceRegistrationCheck = NO;
         filePresenterQueue = [[NSOperationQueue alloc] init];
         
         cloudStoreURL = [newURL copy];
@@ -96,8 +98,10 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 
 -(void)devicesListDidUpdate:(NSNotification *)notif
 {
-    if ( haveInformedDelegateOfReset ) return;
+    if ( haveInformedDelegateOfReset || performingDeviceRegistrationCheck ) return;
+    performingDeviceRegistrationCheck = YES;
     [self checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
+        performingDeviceRegistrationCheck = NO;
         if ( !deviceIsPresent && cloudSyncEnabled ) {
             haveInformedDelegateOfReset = YES;
             [delegate cloudResetSentinelDidDetectReset:self];
