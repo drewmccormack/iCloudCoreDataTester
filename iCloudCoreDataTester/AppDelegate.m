@@ -70,7 +70,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     }];
 }
 
-#pragma mark File Locations
+#pragma mark Files and Directories
 
 -(NSURL *)localStoreURL
 {
@@ -92,6 +92,15 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     NSURL *appSupportURL = [[fileManager URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask] lastObject];
     NSString *bundleId = [[NSBundle mainBundle] bundleIdentifier];
     return [appSupportURL URLByAppendingPathComponent:bundleId];
+}
+
+-(void)removeApplicationDirectory
+{
+    NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+    [coordinator coordinateWritingItemAtURL:self.applicationFilesDirectory options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
+        NSFileManager *fm = [[NSFileManager alloc] init];
+        [fm removeItemAtURL:newURL error:NULL];
+    }];
 }
 
 #pragma mark Adding/Removing Objects
@@ -185,7 +194,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     [self tearDownCoreDataStack:self];
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
     [[NSUserDefaults standardUserDefaults] synchronize];
-    [[NSFileManager defaultManager] removeItemAtURL:[self applicationFilesDirectory] error:NULL];
+    [self removeApplicationDirectory];
     [self setupCoreDataStack:self];
 }
 
@@ -362,7 +371,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
             BOOL migrateDataFromCloud = [[NSFileManager defaultManager] fileExistsAtPath:self.cloudStoreURL.path];
             if ( migrateDataFromCloud ) {
                 // Already cloud data present, so replace local data with it
-                [self removeLocalFiles:self];
+                [self migrateStoreFromCloud];
             }
             else {
                 // No cloud data, so migrate local data to the cloud
@@ -374,8 +383,21 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     }];
 }
 
+-(void)migrateStoreFromCloud
+{
+    NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
+    [defs setBool:YES forKey:MCUsingCloudStorageDefault];
+    [defs synchronize];
+    [self removeApplicationDirectory];
+    [self setupCoreDataStack:self];
+}
+
 -(void)migrateStoreToCloud
 {
+    NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
+    [defs setBool:YES forKey:MCUsingCloudStorageDefault];
+    [defs synchronize];
+    
     NSError *error;
     NSURL *storeURL = self.localStoreURL;
     NSURL *oldStoreURL = [[self applicationFilesDirectory] URLByAppendingPathComponent:@"OldStore"];
