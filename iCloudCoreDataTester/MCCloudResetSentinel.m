@@ -99,13 +99,18 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 -(void)devicesListDidUpdate:(NSNotification *)notif
 {
     if ( haveInformedDelegateOfReset || performingDeviceRegistrationCheck ) return;
+    [devicesListMetadataQuery disableUpdates];
     performingDeviceRegistrationCheck = YES;
     [self checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
         performingDeviceRegistrationCheck = NO;
         if ( !deviceIsPresent && cloudSyncEnabled ) {
             haveInformedDelegateOfReset = YES;
+            [self stopMonitoringDevicesList];
             [delegate cloudResetSentinelDidDetectReset:self];
             [[NSNotificationCenter defaultCenter] postNotificationName:MCCloudResetSentinelDidDetectResetNotification object:self userInfo:nil];
+        }
+        else {
+            [devicesListMetadataQuery enableUpdates];
         }
     }];
 }
