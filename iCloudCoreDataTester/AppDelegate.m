@@ -398,7 +398,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     [defs setBool:YES forKey:MCUsingCloudStorageDefault];
     [defs synchronize];
     
-    NSError *error;
+    __block NSError *error;
     NSURL *storeURL = self.localStoreURL;
     NSURL *oldStoreURL = [[self applicationFilesDirectory] URLByAppendingPathComponent:@"OldStore"];
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -410,7 +410,12 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     [fileManager removeItemAtURL:oldStoreURL error:NULL];
     
     // Move existing local store aside
-    if ( ![fileManager moveItemAtURL:storeURL toURL:oldStoreURL error:&error] ) {
+    __block BOOL success = NO;
+    NSFileCoordinator *fileCoordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+    [fileCoordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForMoving error:NULL byAccessor:^(NSURL *url) {
+        success = [fileManager moveItemAtURL:url toURL:oldStoreURL error:&error];
+    }];
+    if ( !success ) {
         [[NSApplication sharedApplication] presentError:error];
         return;
     }
