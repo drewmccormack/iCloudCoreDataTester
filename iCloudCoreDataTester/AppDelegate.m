@@ -379,6 +379,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
             }
         }
         [[NSUserDefaults standardUserDefaults] setBool:YES forKey:MCUsingCloudStorageDefault];
+        [[NSUserDefaults standardUserDefaults] synchronize];
         [self setupCoreDataStack:self];
     }];
 }
@@ -394,10 +395,15 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 -(void)migrateStoreToCloud
 {
+    // Turn on syncing in prefs
     NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
     [defs setBool:YES forKey:MCUsingCloudStorageDefault];
     [defs synchronize];
     
+    // Remove cloud files
+    [self removeCloudData];
+    
+    // Create URL for a temporary (old) store
     __block NSError *error;
     NSURL *storeURL = self.localStoreURL;
     NSURL *oldStoreURL = [[self applicationFilesDirectory] URLByAppendingPathComponent:@"OldStore"];
@@ -409,7 +415,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     // Remove any existing old store file left over from a previous migration
     [fileManager removeItemAtURL:oldStoreURL error:NULL];
     
-    // Move existing local store aside
+    // Move existing local store aside. Should do this in a coordinated manner.
     __block BOOL success = NO;
     NSFileCoordinator *fileCoordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
     [fileCoordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForMoving error:NULL byAccessor:^(NSURL *url) {
@@ -452,6 +458,16 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     }
 }
 
+-(void)removeCloudData
+{
+    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+    NSURL *storeURL = self.cloudStoreURL;
+    if ( !storeURL ) return;
+    [coordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
+        [[NSFileManager defaultManager] removeItemAtURL:newURL error:NULL];
+    }];
+}
+
 -(IBAction)removeCloudFiles:(id)sender
 {
     [self saveAction:self];    
@@ -459,14 +475,8 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
     [[NSUserDefaults standardUserDefaults] synchronize];
-
-    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
-    NSURL *storeURL = self.cloudStoreURL;
-    if ( !storeURL ) return;
-    [coordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
-        [[NSFileManager defaultManager] removeItemAtURL:newURL error:NULL];
-    }];
     
+    [self removeCloudData];
     [self setupCoreDataStack:self];
 }
 
