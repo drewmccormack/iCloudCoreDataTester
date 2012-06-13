@@ -168,7 +168,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
             // Setup a sentinel
             BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
             if ( usingCloudStorage ) {
-                weakSelf->sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:weakSelf.cloudStoreURL cloudSyncEnabled:usingCloudStorage];
+                weakSelf->sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:weakSelf.cloudStoreURL];
                 weakSelf->sentinel.delegate = self;
                 [weakSelf->sentinel updateDevicesList:NULL];
             }
@@ -312,8 +312,9 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     }
     
     // Use a temporary sentinel to determine if a reset of cloud data has occurred
-    MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:usingCloudStorage];
     if ( usingCloudStorage ) {
+        MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL];
+        [tempSentinel stopMonitoringDevicesList];
         [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
             dispatch_async(completionQueue, ^{
                 completionBlock(!deviceIsPresent);
@@ -344,7 +345,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     // In that case, the only option is to replace the whole cloud container.
     // If the device never synced before, the user can choose to keep the 
     // local or the cloud data.
-    MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL cloudSyncEnabled:NO];
+    MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL];
     [tempSentinel stopMonitoringDevicesList];
     [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
         if ( deviceIsPresent ) {

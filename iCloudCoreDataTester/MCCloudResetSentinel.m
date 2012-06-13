@@ -10,7 +10,6 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 
 @interface MCCloudResetSentinel ()
 
-@property (nonatomic, readwrite, assign) BOOL cloudSyncEnabled;
 @property (nonatomic, readonly, strong) NSURL *syncedDevicesListURL;
 
 @end
@@ -22,11 +21,10 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
     NSOperationQueue *filePresenterQueue;
 }
 
-@synthesize cloudSyncEnabled;
 @synthesize cloudStoreURL;
 @synthesize delegate;
 
--(id)initWithCloudStorageURL:(NSURL *)newURL cloudSyncEnabled:(BOOL)usingStorage
+-(id)initWithCloudStorageURL:(NSURL *)newURL
 {
     self = [super init];
     if ( self ) {
@@ -35,7 +33,6 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
         filePresenterQueue = [[NSOperationQueue alloc] init];
         
         cloudStoreURL = [newURL copy];
-        cloudSyncEnabled = usingStorage;
         if ( !cloudStoreURL ) [NSException raise:MCSentinelException format:@"Attempt to init a sentinel with cloudStoreURL nil"];
         
         // Listen for changes in the metadata of the devices list
@@ -103,7 +100,7 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
     performingDeviceRegistrationCheck = YES;
     [self checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
         performingDeviceRegistrationCheck = NO;
-        if ( !deviceIsPresent && cloudSyncEnabled ) {
+        if ( !deviceIsPresent ) {
             haveInformedDelegateOfReset = YES;
             [self stopMonitoringDevicesList];
             [delegate cloudResetSentinelDidDetectReset:self];
@@ -185,14 +182,15 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
                 if ( !devices ) devices = [NSMutableArray array]; 
                 NSString *deviceId = [self.class deviceIdentifier];
                 
-                if ( ![devices containsObject:deviceId] && cloudSyncEnabled ) {
+                if ( ![devices containsObject:deviceId] ) {
                     [devices addObject:deviceId];
                     updated = YES;
                 } 
             }];
             
             [coordinator coordinateWritingItemAtURL:self.cloudStoreURL options:0 error:NULL byAccessor:^(NSURL *newURL) {
-                [[NSFileManager defaultManager] createDirectoryAtURL:newURL withIntermediateDirectories:YES attributes:nil error:NULL];
+                NSFileManager *fm = [[NSFileManager alloc] init];
+                [fm createDirectoryAtURL:newURL withIntermediateDirectories:YES attributes:nil error:NULL];
             }];
             
             if ( updated ) [coordinator coordinateWritingItemAtURL:url options:NSFileCoordinatorWritingForReplacing error:NULL byAccessor:^(NSURL *writeURL) {

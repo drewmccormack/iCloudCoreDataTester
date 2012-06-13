@@ -38,13 +38,12 @@ extern NSString * const MCSentinelException;
 
 @interface MCCloudResetSentinel : NSObject <NSFilePresenter>
 
-@property (nonatomic, readonly, assign) BOOL cloudSyncEnabled;
 @property (nonatomic, readonly, strong) NSURL *cloudStoreURL;
 @property (nonatomic, readwrite, weak) id <MCCloudResetSentinelDelegate> delegate;
 
 +(NSString *)devicesListFilename;
 
--(id)initWithCloudStorageURL:(NSURL *)newURL cloudSyncEnabled:(BOOL)usingStorage;
+-(id)initWithCloudStorageURL:(NSURL *)newURL;
 
 -(void)checkCurrentDeviceRegistration:(void (^)(BOOL deviceIsPresent))completionBlock;
 -(void)updateDevicesList:(void (^)(void))completionBlock;
