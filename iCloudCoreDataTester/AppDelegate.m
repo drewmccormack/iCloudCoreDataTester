@@ -167,24 +167,25 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     
     __weak AppDelegate *weakSelf = self;
     [self addStoreToPersistentStoreCoordinator:^(BOOL success, NSError *error) {
+        __strong AppDelegate *strongSelf = weakSelf;
         if ( !success ) {
-            [weakSelf tearDownCoreDataStack:weakSelf];
+            [strongSelf tearDownCoreDataStack:strongSelf];
             [[NSApplication sharedApplication] presentError:error];
         }
         else {
-            [weakSelf makeManagedObjectContext];
+            [strongSelf makeManagedObjectContext];
             
             // Setup a sentinel
             BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
             if ( usingCloudStorage ) {
-                weakSelf->sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:weakSelf.cloudStoreURL];
-                weakSelf->sentinel.delegate = self;
-                [weakSelf->sentinel updateDevicesList:NULL];
+                strongSelf->sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:strongSelf.cloudStoreURL];
+                strongSelf->sentinel.delegate = self;
+                [strongSelf->sentinel updateDevicesList:NULL];
             }
             
-            weakSelf.stackIsSetup = YES;
+            strongSelf.stackIsSetup = YES;
         }
-        weakSelf.stackIsLoading = NO;
+        strongSelf.stackIsLoading = NO;
     }];
 }
 
