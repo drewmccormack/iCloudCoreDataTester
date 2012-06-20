@@ -430,7 +430,8 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     // Options for new cloud store
     NSDictionary *localOnlyOptions = [NSDictionary dictionaryWithObjectsAndKeys:
         (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
-        (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption, 
+        (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption,
+        (id)kCFBooleanTrue, NSReadOnlyPersistentStoreOption,
         nil];
     NSDictionary *cloudOptions = [NSDictionary dictionaryWithObjectsAndKeys:
         (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
