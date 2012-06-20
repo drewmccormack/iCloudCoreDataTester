@@ -462,11 +462,22 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 -(void)removeCloudData
 {
-    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
     NSURL *storeURL = self.cloudStoreURL;
     if ( !storeURL ) return;
+    
+    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+    NSString *path = storeURL.path;
+    NSArray *subPaths = [fileManager subpathsOfDirectoryAtPath:path error:NULL];
+    for ( NSString *subPath in subPaths ) {
+        NSString *fullPath = [path stringByAppendingPathComponent:subPath];
+        [coordinator coordinateWritingItemAtURL:[NSURL fileURLWithPath:fullPath] options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
+            [fileManager removeItemAtURL:newURL error:NULL];
+        }];
+    }
+    
     [coordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
-        [[NSFileManager defaultManager] removeItemAtURL:newURL error:NULL];
+        [fileManager removeItemAtURL:newURL error:NULL];
     }];
 }
 
