@@ -1,5 +1,6 @@
 
 #import "AppDelegate.h"
+#import "MCPersistentStoreMigrator.h"
 
 static NSString * const MCCloudMainStoreFileName = @"com.mentalfaculty.icloudcoredatatester.1";
 static NSString * const MCUsingCloudStorageDefault = @"MCUsingCloudStorageDefault";
@@ -437,17 +438,32 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
         MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
         self.cloudStoreURL, NSPersistentStoreUbiquitousContentURLKey, 
         nil];
-    NSPersistentStoreCoordinator *coordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.managedObjectModel];
-    id oldStore = [coordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:oldStoreURL options:localOnlyOptions error:&error];
-    if ( !oldStore ) {
-        // Move back the old store and present the error
-        [fileManager moveItemAtURL:oldStoreURL toURL:storeURL error:NULL];
-        [[NSApplication sharedApplication] presentError:error];
-        return;
-    }
-        
-    // Migrate existing (old) store to new store
-    if ( ![coordinator migratePersistentStore:oldStore toURL:storeURL options:cloudOptions withType:NSSQLiteStoreType error:&error] ) {
+    
+    // Here we use a migrator to keep memory low. If small store, could just use
+    // the NSPersistentStoreCoordinator method migratePersistentStore:toURL:options:withType:error:
+    MCPersistentStoreMigrator *migrator = [[MCPersistentStoreMigrator alloc] initWithManagedObjectModel:self.managedObjectModel sourceStoreURL:oldStoreURL destinationStoreURL:storeURL];
+    migrator.sourceStoreOptions = localOnlyOptions;
+    migrator.destinationStoreOptions = cloudOptions;
+    
+    // Begin migration
+    BOOL migrationSucceeded = YES;
+    [migrator beginMigration];
+    
+    // Migrate the Note entity in batches of 100. This also migrates all objects connected to 
+    // the notes, either directly or indirectly.
+    // To demonstrate that you can 'snip' a object graph up into sub-graphs, to avoid migrating
+    // everything at once, we here snip a few relationships to prevent the Facet entity being migrated.
+    // Note that you can only snip optional relationships, otherwise validation will fail when saving.
+    migrationSucceeded &= [migrator migrateEntityWithName:@"Note" batchSize:100 save:YES error:&error];
+    
+    // Migrate the Facets in now. Batch size of 0 is infinite, ie, no batching.
+    migrationSucceeded &= [migrator migrateEntityWithName:@"Facet" batchSize:0 save:YES error:&error];
+    
+    // End migration
+    [migrator endMigration];
+    
+    // Clean up
+    if ( !migrationSucceeded ) {
         [fileManager removeItemAtURL:storeURL error:NULL];
         [fileManager moveItemAtURL:oldStoreURL toURL:storeURL error:NULL];
         [[NSApplication sharedApplication] presentError:error];
@@ -460,11 +476,25 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 -(void)removeCloudData
 {
-    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
     NSURL *storeURL = self.cloudStoreURL;
     if ( !storeURL ) return;
+    
+    NSFileCoordinator* coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+    
+    // Iterate over subpaths and delete
+    NSString *path = storeURL.path;
+    NSArray *subPaths = [fileManager subpathsOfDirectoryAtPath:path error:NULL];
+    for ( NSString *subPath in subPaths ) {
+        NSString *fullPath = [path stringByAppendingPathComponent:subPath];
+        [coordinator coordinateWritingItemAtURL:[NSURL fileURLWithPath:fullPath] options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
+            [fileManager removeItemAtURL:newURL error:NULL];
+        }];
+    }
+    
+    // Delete the root directory too
     [coordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting error:NULL byAccessor:^(NSURL *newURL) {
-        [[NSFileManager defaultManager] removeItemAtURL:newURL error:NULL];
+        [fileManager removeItemAtURL:newURL error:NULL];
     }];
 }
 

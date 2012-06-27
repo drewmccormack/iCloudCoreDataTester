@@ -14,6 +14,7 @@
 		070CF2D01512406A00D0C8CA /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 070CF2CF1512406A00D0C8CA /* AppDelegate.m */; };
 		070CF2D31512406A00D0C8CA /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = 070CF2D11512406A00D0C8CA /* MainMenu.xib */; };
 		070CF2D61512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 070CF2D41512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodeld */; };
+		0741FCD3159B35AF00EC5A12 /* MCPersistentStoreMigrator.m in Sources */ = {isa = PBXBuildFile; fileRef = 0741FCD2159B35AF00EC5A12 /* MCPersistentStoreMigrator.m */; };
 		07AB01D7157B54C300B24E3B /* MCCloudResetSentinel.m in Sources */ = {isa = PBXBuildFile; fileRef = 07AB01D6157B54C300B24E3B /* MCCloudResetSentinel.m */; };
 		07AB01DB157B555800B24E3B /* NSURLExtensions.m in Sources */ = {isa = PBXBuildFile; fileRef = 07AB01DA157B555800B24E3B /* NSURLExtensions.m */; };
 		07D24124157BA4CE00808BF6 /* License.txt in Resources */ = {isa = PBXBuildFile; fileRef = 07D24123157BA4CE00808BF6 /* License.txt */; };
@@ -35,6 +36,8 @@
 		070CF2D21512406A00D0C8CA /* en */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = en; path = en.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		070CF2D51512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = iCloudCoreDataTester.xcdatamodel; sourceTree = "<group>"; };
 		072661DE15135B800015E115 /* iCloudCoreDataTester.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = iCloudCoreDataTester.entitlements; sourceTree = "<group>"; };
+		0741FCD1159B35AF00EC5A12 /* MCPersistentStoreMigrator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MCPersistentStoreMigrator.h; sourceTree = "<group>"; };
+		0741FCD2159B35AF00EC5A12 /* MCPersistentStoreMigrator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MCPersistentStoreMigrator.m; sourceTree = "<group>"; };
 		07AB01D5157B54C300B24E3B /* MCCloudResetSentinel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MCCloudResetSentinel.h; sourceTree = "<group>"; };
 		07AB01D6157B54C300B24E3B /* MCCloudResetSentinel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MCCloudResetSentinel.m; sourceTree = "<group>"; };
 		07AB01D9157B555800B24E3B /* NSURLExtensions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NSURLExtensions.h; sourceTree = "<group>"; };
@@ -100,6 +103,8 @@
 				07AB01DA157B555800B24E3B /* NSURLExtensions.m */,
 				07AB01D5157B54C300B24E3B /* MCCloudResetSentinel.h */,
 				07AB01D6157B54C300B24E3B /* MCCloudResetSentinel.m */,
+				0741FCD1159B35AF00EC5A12 /* MCPersistentStoreMigrator.h */,
+				0741FCD2159B35AF00EC5A12 /* MCPersistentStoreMigrator.m */,
 				070CF2D11512406A00D0C8CA /* MainMenu.xib */,
 				070CF2D41512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodeld */,
 				072661DE15135B800015E115 /* iCloudCoreDataTester.entitlements */,
@@ -190,6 +195,7 @@
 				070CF2D61512406A00D0C8CA /* iCloudCoreDataTester.xcdatamodeld in Sources */,
 				07AB01D7157B54C300B24E3B /* MCCloudResetSentinel.m in Sources */,
 				07AB01DB157B555800B24E3B /* NSURLExtensions.m in Sources */,
+				0741FCD3159B35AF00EC5A12 /* MCPersistentStoreMigrator.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
