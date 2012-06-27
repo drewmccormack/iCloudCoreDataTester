@@ -21,7 +21,8 @@
 
 -(id)initWithManagedObjectModel:(NSManagedObjectModel *)model sourceStoreURL:(NSURL *)sourceURL destinationStoreURL:(NSURL *)destinationURL;
 
-// Invoke these before and after all sub-migrations
+// Invoke these at the beginning and end of the migration.
+// All relationship snips and sub-migrations should fall in between.
 -(void)beginMigration;
 -(void)endMigration;
 
