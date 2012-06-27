@@ -1,10 +1,3 @@
-//
-//  MCPersistentStoreMigrator.m
-//  Mental Case 2
-//
-//  Created by Drew McCormack on 6/22/12.
-//  Copyright (c) 2012 The Mental Faculty. All rights reserved.
-//
 
 #import <CoreData/CoreData.h>
 
