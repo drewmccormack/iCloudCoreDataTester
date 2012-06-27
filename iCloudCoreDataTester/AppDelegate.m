@@ -454,12 +454,14 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     // Migrate the Note entity in batches of 100. This also migrates all objects connected to 
     // the notes, either directly or indirectly.
     // To demonstrate that you can 'snip' a object graph up into sub-graphs, to avoid migrating
-    // everything at once, we here snip a few relationships to prevent the Facet entity being migrated.
+    // everything at once, we here snip a few relationships so that only Note and Facet objects are migrated first.
     // Note that you can only snip optional relationships, otherwise validation will fail when saving.
+    [migrator snipRelationship:@"permutations" inEntity:@"Note"];
+    [migrator snipRelationship:@"permutations" inEntity:@"Facet"];
     migrationSucceeded &= [migrator migrateEntityWithName:@"Note" batchSize:100 save:YES error:&error];
     
-    // Migrate the Facets in now. Batch size of 0 is infinite, ie, no batching.
-    migrationSucceeded &= [migrator migrateEntityWithName:@"Facet" batchSize:0 save:YES error:&error];
+    // Migrate the Permutations (and connected MOs) in now. Batch size of 0 is infinite, ie, no batching.
+    migrationSucceeded &= [migrator migrateEntityWithName:@"Permutation" batchSize:0 save:YES error:&error];
     
     // End migration
     [migrator endMigration];
