@@ -166,7 +166,8 @@
         [sourceObjectIDsOfUnsavedCounterparts addObject:rootObject.objectID];
         
         // Set attributes
-        for ( NSString *key in entity.attributeKeys ) {
+        NSArray *attributeKeys = entity.attributesByName.allKeys;
+        for ( NSString *key in attributeKeys ) {
             [counterpart setPrimitiveValue:[rootObject primitiveValueForKey:key] forKey:key];
         }
         
