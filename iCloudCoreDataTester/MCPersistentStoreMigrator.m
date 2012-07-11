@@ -42,14 +42,18 @@
     // Destination context
     NSError *error;
     NSPersistentStoreCoordinator *destinationCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:managedObjectModel];
+    [destinationCoordinator lock];
     destinationStore = [destinationCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:destinationStoreURL options:destinationStoreOptions error:&error];
+    [destinationCoordinator unlock];
     NSAssert(destinationStore != nil, @"Destination Store was nil: %@", error);
     destinationContext = [[NSManagedObjectContext alloc] init];
     destinationContext.persistentStoreCoordinator = destinationCoordinator;
     
     // Source context
     NSPersistentStoreCoordinator *sourceCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:managedObjectModel];
+    [sourceCoordinator lock];
     sourceStore = [sourceCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:sourceStoreURL options:sourceStoreOptions error:&error];
+    [sourceCoordinator unlock];
     NSAssert(sourceStore != nil, @"Source Store was nil: %@", error);
     sourceContext = [[NSManagedObjectContext alloc] init];
     sourceContext.persistentStoreCoordinator = sourceCoordinator;
