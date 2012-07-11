@@ -285,10 +285,15 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     dispatch_queue_t serialQueue = dispatch_queue_create("pscqueue", DISPATCH_QUEUE_SERIAL);
     dispatch_async(serialQueue, ^{
         NSError *error;
-        [self.persistentStoreCoordinator lock];
-        id store = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:url options:options error:&error];
-        [self.persistentStoreCoordinator unlock];
-            
+        id store = nil;
+        int attempts = 0;
+        while ( !store && attempts++ < 20 ) {
+            sleep(5);
+            [self.persistentStoreCoordinator lock];
+            store = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:url options:options error:&error];
+            [self.persistentStoreCoordinator unlock];
+        }
+
         dispatch_async(completionQueue, ^{
             completionBlock(nil != store, error);
             dispatch_release(completionQueue);
