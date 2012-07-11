@@ -463,10 +463,10 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     // Note that you can only snip optional relationships, otherwise validation will fail when saving.
     [migrator snipRelationship:@"permutations" inEntity:@"Note"];
     [migrator snipRelationship:@"permutations" inEntity:@"Facet"];
-    migrationSucceeded &= [migrator migrateEntityWithName:@"Note" batchSize:100 save:YES error:&error];
+    migrationSucceeded &= [migrator migrateEntityWithName:@"Note" batchSize:0 save:NO error:&error];
     
     // Migrate the Permutations (and connected MOs) in now. Batch size of 0 is infinite, ie, no batching.
-    migrationSucceeded &= [migrator migrateEntityWithName:@"Permutation" batchSize:0 save:YES error:&error];
+    migrationSucceeded &= [migrator migrateEntityWithName:@"Permutation" batchSize:10 save:YES error:&error];
     
     // End migration
     [migrator endMigration];
