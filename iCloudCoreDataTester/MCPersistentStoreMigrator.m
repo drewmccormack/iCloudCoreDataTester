@@ -55,7 +55,8 @@
     sourceContext.persistentStoreCoordinator = sourceCoordinator;
     
     // Copy metadata
-    NSDictionary *metadata = [sourceCoordinator metadataForPersistentStore:sourceStore];
+    NSMutableDictionary *metadata = [[sourceCoordinator metadataForPersistentStore:sourceStore] mutableCopy];
+    [metadata addEntriesFromDictionary:[destinationCoordinator metadataForPersistentStore:destinationStore]];
     [destinationCoordinator setMetadata:metadata forPersistentStore:destinationStore];
 }
 
