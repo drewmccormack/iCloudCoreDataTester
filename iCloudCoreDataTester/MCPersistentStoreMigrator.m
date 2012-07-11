@@ -44,7 +44,7 @@
     NSPersistentStoreCoordinator *destinationCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:managedObjectModel];
     destinationStore = [destinationCoordinator addPersistentStoreWithType:NSSQLiteStoreType configuration:nil URL:destinationStoreURL options:destinationStoreOptions error:&error];
     NSAssert(destinationStore != nil, @"Destination Store was nil: %@", error);
-    destinationContext = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSPrivateQueueConcurrencyType];
+    destinationContext = [[NSManagedObjectContext alloc] init];
     destinationContext.persistentStoreCoordinator = destinationCoordinator;
     
     // Source context
