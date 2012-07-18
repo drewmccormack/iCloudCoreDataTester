@@ -6,7 +6,10 @@
 NSString * const MCCloudResetSentinelDidDetectResetNotification = @"MCCloudResetSentinelDidDetectResetNotification"; 
 NSString * const MCSentinelException = @"MCSentinelException";
 
+NSString * const MCCloudResetSentinelSyncDataSetIDUserDefaultKey = @"MCCloudResetSentinelSyncDataSetIDUserDefaultKey";
+
 static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist";
+static NSString * const MCSentinelAppUniqueIdDefault = @"MCSentinelAppUniqueIdDefault";
 
 @interface MCCloudResetSentinel ()
 
@@ -125,19 +128,28 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
     
     dispatch_queue_t completionQueue = dispatch_get_current_queue();
     dispatch_retain(completionQueue);
-        
+    
     NSURL *url = self.syncedDevicesListURL;
-    [url syncWithCloud:^(BOOL succeeded, NSError *error) {        
+    [url syncWithCloud:^(BOOL succeeded, NSError *error) {
+        if ( !succeeded ) NSLog(@"%@", error);
         NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:self];
-        [coordinator coordinateReadingItemAtURL:url options:0 error:NULL byAccessor:^(NSURL *readURL) {
-            NSArray *devices = [NSArray arrayWithContentsOfURL:readURL];
+        error = nil;
+        [coordinator coordinateReadingItemAtURL:url options:0 error:&error byAccessor:^(NSURL *readURL) {
+            NSDictionary *plist = [NSDictionary dictionaryWithContentsOfURL:readURL];
+            NSArray *devices = [plist objectForKey:@"devices"];
             NSString *deviceId = [self.class deviceIdentifier];
             BOOL deviceIsRegistered = [devices containsObject:deviceId];
+            
+            NSString *dataset = [plist objectForKey:@"dataset"];
+            NSString *defaultsDataset = [[NSUserDefaults standardUserDefaults] stringForKey:MCCloudResetSentinelSyncDataSetIDUserDefaultKey];
+            deviceIsRegistered &= [dataset isEqualToString:defaultsDataset];
+            
             dispatch_async(completionQueue, ^{
                 if ( completionBlock ) completionBlock(deviceIsRegistered);
                 dispatch_release(completionQueue);
             });
         }];
+        if ( error ) NSLog(@"%@", error);
     }];
 }
 
@@ -149,19 +161,18 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
 
 +(NSString *)deviceIdentifier
 {
-    static NSString * const MCAppUniqueId = @"MCAppUniqueId";
     NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
-    NSString *uniqueId = [defs stringForKey:MCAppUniqueId];
+    NSString *uniqueId = [defs stringForKey:MCSentinelAppUniqueIdDefault];
     if ( !uniqueId ) {
         uniqueId = [[NSProcessInfo processInfo] globallyUniqueString];
-        [defs setObject:uniqueId forKey:MCAppUniqueId];
+        [defs setObject:uniqueId forKey:MCSentinelAppUniqueIdDefault];
         [defs synchronize];
     }
     return uniqueId;
 }
 
 -(void)updateDevicesList:(void (^)(void))completionBlock
-{
+{    
     NSURL *url = self.syncedDevicesListURL;
     if ( !url ) [NSException raise:MCSentinelException format:@"Attempt to update devices list with iCloud syncing disabled."];
     
@@ -174,28 +185,46 @@ static NSString * const MCSyncingDevicesListFilename = @"MCSyncingDevices.plist"
         [url syncWithCloud:^(BOOL succeeded, NSError *error) {
             if ( !succeeded ) return;
             
-            __block BOOL updated = NO;
-            __block NSMutableArray *devices = nil;
+            // Read in plist
+            __block NSMutableDictionary *plist = nil;
             NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:self];
             [coordinator coordinateReadingItemAtURL:url options:0 error:NULL byAccessor:^(NSURL *readURL) {
-                devices = [NSMutableArray arrayWithContentsOfURL:readURL];
-                if ( !devices ) devices = [NSMutableArray array]; 
-                NSString *deviceId = [self.class deviceIdentifier];
+                plist = [NSMutableDictionary dictionaryWithContentsOfURL:readURL];
+            }];
+            if ( !plist ) plist = [NSMutableDictionary dictionary];
+            
+            // Update device list
+            NSMutableArray *devices = [[plist objectForKey:@"devices"] mutableCopy];
+            if ( !devices ) devices = [NSMutableArray array];
+            NSString *deviceId = [self.class deviceIdentifier];
+            
+            BOOL updated = NO;
+            if ( ![devices containsObject:deviceId] ) {
+                [devices addObject:deviceId];
+                [plist setObject:devices forKey:@"devices"];
+                updated = YES;
+            }
+            
+            // Update data set check
+            id dataSetString = [plist objectForKey:@"dataset"];
+            if ( !dataSetString ) {
+                dataSetString = [[NSProcessInfo processInfo] globallyUniqueString];
+                [[NSUserDefaults standardUserDefaults] setObject:dataSetString forKey:MCCloudResetSentinelSyncDataSetIDUserDefaultKey];
+                [[NSUserDefaults standardUserDefaults] synchronize];
+                [plist setObject:dataSetString forKey:@"dataset"];
+                updated = YES;
+            }
+            
+            // Write to file
+            if ( updated ) {
+                [coordinator coordinateWritingItemAtURL:self.cloudStoreURL options:0 error:NULL byAccessor:^(NSURL *newURL) {
+                    [[NSFileManager defaultManager] createDirectoryAtURL:newURL withIntermediateDirectories:YES attributes:nil error:NULL];
+                }];
                 
-                if ( ![devices containsObject:deviceId] ) {
-                    [devices addObject:deviceId];
-                    updated = YES;
-                } 
-            }];
-            
-            [coordinator coordinateWritingItemAtURL:self.cloudStoreURL options:0 error:NULL byAccessor:^(NSURL *newURL) {
-                NSFileManager *fm = [[NSFileManager alloc] init];
-                [fm createDirectoryAtURL:newURL withIntermediateDirectories:YES attributes:nil error:NULL];
-            }];
-            
-            if ( updated ) [coordinator coordinateWritingItemAtURL:url options:NSFileCoordinatorWritingForReplacing error:NULL byAccessor:^(NSURL *writeURL) {
-                [devices writeToURL:writeURL atomically:YES];
-            }];
+                [coordinator coordinateWritingItemAtURL:url options:NSFileCoordinatorWritingForReplacing error:NULL byAccessor:^(NSURL *writeURL) {
+                    [plist writeToURL:writeURL atomically:NO];
+                }];
+            }
             
             dispatch_async(completionQueue, ^{
                 if ( completionBlock ) completionBlock();
