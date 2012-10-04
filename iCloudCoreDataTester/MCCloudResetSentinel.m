@@ -206,13 +206,16 @@ static NSString * const MCSentinelAppUniqueIdDefault = @"MCSentinelAppUniqueIdDe
             }
             
             // Update data set check
+            id defaultsDataSetString = [[NSUserDefaults standardUserDefaults] objectForKey:MCCloudResetSentinelSyncDataSetIDUserDefaultKey];
             id dataSetString = [plist objectForKey:@"dataset"];
             if ( !dataSetString ) {
                 dataSetString = [[NSProcessInfo processInfo] globallyUniqueString];
-                [[NSUserDefaults standardUserDefaults] setObject:dataSetString forKey:MCCloudResetSentinelSyncDataSetIDUserDefaultKey];
-                [[NSUserDefaults standardUserDefaults] synchronize];
                 [plist setObject:dataSetString forKey:@"dataset"];
                 updated = YES;
+            }
+            if ( ![dataSetString isEqualToString:defaultsDataSetString] ) {
+                [[NSUserDefaults standardUserDefaults] setObject:dataSetString forKey:MCCloudResetSentinelSyncDataSetIDUserDefaultKey];
+                [[NSUserDefaults standardUserDefaults] synchronize];
             }
             
             // Write to file
