@@ -256,7 +256,10 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 {
     if ( completionBlock ) completionBlock = [completionBlock copy];
     dispatch_queue_t completionQueue = dispatch_get_current_queue();
+    
+#if !OS_OBJECT_USE_OBJC
     dispatch_retain(completionQueue);
+#endif
     
     // Use cloud storage if iCloud is enabled, and the user default is set to YES.
     NSURL *storeURL = self.cloudStoreURL;
@@ -296,10 +299,13 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
         dispatch_async(completionQueue, ^{
             completionBlock(nil != store, error);
+#if !OS_OBJECT_USE_OBJC
             dispatch_release(completionQueue);
+#endif
         });
-        
+#if !OS_OBJECT_USE_OBJC
         dispatch_release(serialQueue);
+#endif
     });
 }
 
@@ -316,13 +322,17 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 -(void)checkIfCloudDataHasBeenReset:(void (^)(BOOL hasBeenReset))completionBlock
 {
     dispatch_queue_t completionQueue = dispatch_get_current_queue();
+#if !OS_OBJECT_USE_OBJC
     dispatch_retain(completionQueue);
+#endif
     
     BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
     if ( usingCloudStorage && !self.cloudStoreURL ) {
         dispatch_async(completionQueue, ^{
             completionBlock(YES);
+#if !OS_OBJECT_USE_OBJC
             dispatch_release(completionQueue);
+#endif
         });
         return;
     }
@@ -334,14 +344,18 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
         [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
             dispatch_async(completionQueue, ^{
                 completionBlock(!deviceIsPresent);
+#if !OS_OBJECT_USE_OBJC
                 dispatch_release(completionQueue);
+#endif
             });
         }];
     }
     else {
         dispatch_async(completionQueue, ^{
             completionBlock(NO);
+#if !OS_OBJECT_USE_OBJC
             dispatch_release(completionQueue);
+#endif
         });
     }
 }
