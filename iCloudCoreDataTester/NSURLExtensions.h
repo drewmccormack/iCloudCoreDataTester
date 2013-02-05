@@ -3,6 +3,6 @@
 
 @interface NSURL (MCExtensions)
 
--(void)syncWithCloud:(void (^)(BOOL success, NSError *error))completionBlock;
+- (void) syncWithCloud:(void (^)(BOOL success, NSError *error))completionBlock;
 
 @end
