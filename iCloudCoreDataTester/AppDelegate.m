@@ -66,8 +66,15 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 -(void)applicationDidFinishLaunching:(NSNotification *)notification
 {
     [self checkIfCloudDataHasBeenReset:^(BOOL hasBeenReset) {
-        if ( hasBeenReset ) [self disableCloudAfterResetAndWarnUser];
-        [self setupCoreDataStack:self];
+        if ( hasBeenReset ) {
+            [self disableCloudAfterResetAndWarnUser];
+            [self convertCloudStoreToLocalOnlyStore:^{
+                [self setupCoreDataStack:self];
+            }];
+        }
+        else {
+            [self setupCoreDataStack:self];
+        }
     }];
 }
 
@@ -488,6 +495,30 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     });
 }
 
+-(void)convertCloudStoreToLocalOnlyStore:(void(^)(void))completionBlock
+{
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        // Store options for migration
+        NSDictionary *localOnlyOptions = @{
+           NSMigratePersistentStoresAutomaticallyOption: @YES,
+           NSInferMappingModelAutomaticallyOption: @YES,
+        };
+        NSDictionary *cloudOptions = @{
+           NSMigratePersistentStoresAutomaticallyOption: @YES,
+           NSInferMappingModelAutomaticallyOption: @YES,
+           NSPersistentStoreUbiquitousContentNameKey: MCCloudMainStoreFileName,
+           NSPersistentStoreUbiquitousContentURLKey: self.cloudStoreURL,
+           NSReadOnlyPersistentStoreOption: @YES
+        };
+        
+        // Migrate in place
+        [self migrateStoreAtURL:self.localStoreURL fromOptions:cloudOptions toOptions:localOnlyOptions];
+        
+        // Complete
+        dispatch_async(dispatch_get_main_queue(), completionBlock);
+    });
+}
+
 -(void)removeCloudData
 {
     NSURL *storeURL = self.cloudStoreURL;
@@ -539,7 +570,9 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     if ( !usingCloudStorage ) return;
     [self tearDownCoreDataStack:self];
     [self disableCloudAfterResetAndWarnUser];
-    [self setupCoreDataStack:self];
+    [self convertCloudStoreToLocalOnlyStore:^{
+        [self setupCoreDataStack:self];
+    }];
 }
 
 -(void)disableCloudAfterResetAndWarnUser
