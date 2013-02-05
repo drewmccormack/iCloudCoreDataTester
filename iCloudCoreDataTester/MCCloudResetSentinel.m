@@ -126,11 +126,6 @@ static NSString * const MCSentinelAppUniqueIdDefault = @"MCSentinelAppUniqueIdDe
 {
     if ( completionBlock ) completionBlock = [completionBlock copy];
     
-#if !OS_OBJECT_USE_OBJC
-    dispatch_queue_t completionQueue = dispatch_get_current_queue();
-    dispatch_retain(completionQueue);
-#endif
-    
     NSURL *url = self.syncedDevicesListURL;
     [url syncWithCloud:^(BOOL succeeded, NSError *error) {
         if ( !succeeded ) NSLog(@"%@", error);
@@ -146,11 +141,8 @@ static NSString * const MCSentinelAppUniqueIdDefault = @"MCSentinelAppUniqueIdDe
             NSString *defaultsDataset = [[NSUserDefaults standardUserDefaults] stringForKey:MCCloudResetSentinelSyncDataSetIDUserDefaultKey];
             deviceIsRegistered &= [dataset isEqualToString:defaultsDataset];
             
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            dispatch_async(dispatch_get_main_queue(), ^{
                 if ( completionBlock ) completionBlock(deviceIsRegistered);
-#if !OS_OBJECT_USE_OBJC
-                dispatch_release(completionQueue);
-#endif
             });
         }];
         if ( error ) NSLog(@"%@", error);
@@ -181,11 +173,6 @@ static NSString * const MCSentinelAppUniqueIdDefault = @"MCSentinelAppUniqueIdDe
     if ( !url ) [NSException raise:MCSentinelException format:@"Attempt to update devices list with iCloud syncing disabled."];
     
     if ( completionBlock ) completionBlock = [completionBlock copy];
-    
-#if !OS_OBJECT_USE_OBJC
-    dispatch_queue_t completionQueue = dispatch_get_current_queue();
-    dispatch_retain(completionQueue);
-#endif
     
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
         [url syncWithCloud:^(BOOL succeeded, NSError *error) {
@@ -235,11 +222,8 @@ static NSString * const MCSentinelAppUniqueIdDefault = @"MCSentinelAppUniqueIdDe
                 }];
             }
             
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            dispatch_async(dispatch_get_main_queue(), ^{
                 if ( completionBlock ) completionBlock();
-#if !OS_OBJECT_USE_OBJC
-                dispatch_release(completionQueue);
-#endif
             });
         }];
     });

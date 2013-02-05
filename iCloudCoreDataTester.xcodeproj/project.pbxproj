@@ -38,6 +38,7 @@
 		072661DE15135B800015E115 /* iCloudCoreDataTester.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = iCloudCoreDataTester.entitlements; sourceTree = "<group>"; };
 		0741FCD1159B35AF00EC5A12 /* MCPersistentStoreMigrator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MCPersistentStoreMigrator.h; sourceTree = "<group>"; };
 		0741FCD2159B35AF00EC5A12 /* MCPersistentStoreMigrator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MCPersistentStoreMigrator.m; sourceTree = "<group>"; };
+		075542DB16C11B6E00054A6B /* README.md */ = {isa = PBXFileReference; lastKnownFileType = text; path = README.md; sourceTree = SOURCE_ROOT; };
 		07AB01D5157B54C300B24E3B /* MCCloudResetSentinel.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MCCloudResetSentinel.h; sourceTree = "<group>"; };
 		07AB01D6157B54C300B24E3B /* MCCloudResetSentinel.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MCCloudResetSentinel.m; sourceTree = "<group>"; };
 		07AB01D9157B555800B24E3B /* NSURLExtensions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NSURLExtensions.h; sourceTree = "<group>"; };
@@ -116,6 +117,7 @@
 		070CF2C31512406A00D0C8CA /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				075542DB16C11B6E00054A6B /* README.md */,
 				070CF2C41512406A00D0C8CA /* iCloudCoreDataTester-Info.plist */,
 				070CF2C51512406A00D0C8CA /* InfoPlist.strings */,
 				070CF2C81512406A00D0C8CA /* main.m */,

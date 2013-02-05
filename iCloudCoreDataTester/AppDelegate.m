@@ -180,7 +180,7 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
             BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
             if ( usingCloudStorage ) {
                 strongSelf->sentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:strongSelf.cloudStoreURL];
-                strongSelf->sentinel.delegate = self;
+                strongSelf->sentinel.delegate = strongSelf;
                 [strongSelf->sentinel updateDevicesList:NULL];
             }
             
@@ -197,7 +197,6 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     [[NSUserDefaults standardUserDefaults] setBool:NO forKey:MCUsingCloudStorageDefault];
     [[NSUserDefaults standardUserDefaults] synchronize];
     [self removeApplicationDirectory];
-    [self setupCoreDataStack:self];
 }
 
 -(NSManagedObjectModel *)managedObjectModel
@@ -255,11 +254,6 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 -(void)addStoreToPersistentStoreCoordinator:(void (^)(BOOL success, NSError *error))completionBlock
 {
     if ( completionBlock ) completionBlock = [completionBlock copy];
-    dispatch_queue_t completionQueue = dispatch_get_current_queue();
-    
-#if !OS_OBJECT_USE_OBJC
-    dispatch_retain(completionQueue);
-#endif
     
     // Use cloud storage if iCloud is enabled, and the user default is set to YES.
     NSURL *storeURL = self.cloudStoreURL;
@@ -297,11 +291,8 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
             [self.persistentStoreCoordinator unlock];
         }
 
-        dispatch_async(completionQueue, ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
             completionBlock(nil != store, error);
-#if !OS_OBJECT_USE_OBJC
-            dispatch_release(completionQueue);
-#endif
         });
 #if !OS_OBJECT_USE_OBJC
         dispatch_release(serialQueue);
@@ -321,18 +312,10 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
 
 -(void)checkIfCloudDataHasBeenReset:(void (^)(BOOL hasBeenReset))completionBlock
 {
-    dispatch_queue_t completionQueue = dispatch_get_current_queue();
-#if !OS_OBJECT_USE_OBJC
-    dispatch_retain(completionQueue);
-#endif
-    
     BOOL usingCloudStorage = [[NSUserDefaults standardUserDefaults] boolForKey:MCUsingCloudStorageDefault];
     if ( usingCloudStorage && !self.cloudStoreURL ) {
-        dispatch_async(completionQueue, ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
             completionBlock(YES);
-#if !OS_OBJECT_USE_OBJC
-            dispatch_release(completionQueue);
-#endif
         });
         return;
     }
@@ -342,20 +325,14 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
         MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL];
         [tempSentinel stopMonitoringDevicesList];
         [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
-            dispatch_async(completionQueue, ^{
+            dispatch_async(dispatch_get_main_queue(), ^{
                 completionBlock(!deviceIsPresent);
-#if !OS_OBJECT_USE_OBJC
-                dispatch_release(completionQueue);
-#endif
             });
         }];
     }
     else {
-        dispatch_async(completionQueue, ^{
+        dispatch_async(dispatch_get_main_queue(), ^{
             completionBlock(NO);
-#if !OS_OBJECT_USE_OBJC
-            dispatch_release(completionQueue);
-#endif
         });
     }
 }
@@ -378,11 +355,18 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     MCCloudResetSentinel *tempSentinel = [[MCCloudResetSentinel alloc] initWithCloudStorageURL:self.cloudStoreURL];
     [tempSentinel stopMonitoringDevicesList];
     [tempSentinel checkCurrentDeviceRegistration:^(BOOL deviceIsPresent) {
+        // This block finishes up after a migration
+        void(^postMigrationBlock)(void) = ^{
+            [[NSUserDefaults standardUserDefaults] setBool:YES forKey:MCUsingCloudStorageDefault];
+            [[NSUserDefaults standardUserDefaults] synchronize];
+            [self setupCoreDataStack:self];
+        };
+        
         if ( deviceIsPresent ) {
             // Only choice is to move data to the cloud, replacing the existing cloud data.
             // In a production app, you should warn the user, and give them a chance
             // to back out.
-            [self migrateStoreToCloud];
+            [self migrateStoreToCloud:postMigrationBlock];
         }
         else {
             // Can keep either the cloud data, or the local data at this point
@@ -392,94 +376,62 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
             BOOL migrateDataFromCloud = [[NSFileManager defaultManager] fileExistsAtPath:self.cloudStoreURL.path];
             if ( migrateDataFromCloud ) {
                 // Already cloud data present, so replace local data with it
-                [self migrateStoreFromCloud];
+                [self migrateStoreFromCloud:postMigrationBlock];
             }
             else {
                 // No cloud data, so migrate local data to the cloud
-                [self migrateStoreToCloud];
+                [self migrateStoreToCloud:postMigrationBlock];
             }
         }
-        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:MCUsingCloudStorageDefault];
-        [[NSUserDefaults standardUserDefaults] synchronize];
-        [self setupCoreDataStack:self];
     }];
 }
 
--(void)migrateStoreFromCloud
+-(void)migrateStoreAtURL:(NSURL *)storeURL fromOptions:(NSDictionary *)sourceOptions toOptions:(NSDictionary *)destinationOptions
 {
-    NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
-    [defs setBool:YES forKey:MCUsingCloudStorageDefault];
-    [defs synchronize];
-    [self removeApplicationDirectory];
-    [self setupCoreDataStack:self];
-}
-
--(void)migrateStoreToCloud
-{
-    // Turn on syncing in prefs
-    NSUserDefaults *defs = [NSUserDefaults standardUserDefaults];
-    [defs setBool:YES forKey:MCUsingCloudStorageDefault];
-    [defs synchronize];
-    
-    // Remove cloud files
-    [self removeCloudData];
-    
     // Create URL for a temporary (old) store
     __block NSError *error;
-    NSURL *storeURL = self.localStoreURL;
     NSURL *oldStoreURL = [[self applicationFilesDirectory] URLByAppendingPathComponent:@"OldStore"];
-    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
     
     // If there is no local store, no need to migrate
     if ( ![fileManager fileExistsAtPath:storeURL.path] ) return;
-        
+    
     // Remove any existing old store file left over from a previous migration
     [fileManager removeItemAtURL:oldStoreURL error:NULL];
     
-    // Move existing local store aside. Should do this in a coordinated manner.
+    // Move existing store aside. Should do this in a coordinated manner.
     __block BOOL success = NO;
     NSFileCoordinator *fileCoordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
-    [fileCoordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForMoving error:NULL byAccessor:^(NSURL *url) {
-        success = [fileManager moveItemAtURL:url toURL:oldStoreURL error:&error];
+    [fileCoordinator coordinateWritingItemAtURL:storeURL options:NSFileCoordinatorWritingForDeleting writingItemAtURL:oldStoreURL options:NSFileCoordinatorWritingForReplacing error:&error byAccessor:^(NSURL *newFromURL, NSURL *newToURL) {
+        success = [fileManager moveItemAtURL:newFromURL toURL:newToURL error:&error];
+        [fileCoordinator itemAtURL:newFromURL didMoveToURL:newToURL];
     }];
+    
     if ( !success ) {
         [[NSApplication sharedApplication] presentError:error];
         return;
     }
     
-    // Options for new cloud store
-    NSDictionary *localOnlyOptions = [NSDictionary dictionaryWithObjectsAndKeys:
-        (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
-        (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption,
-        (id)kCFBooleanTrue, NSReadOnlyPersistentStoreOption,
-        nil];
-    NSDictionary *cloudOptions = [NSDictionary dictionaryWithObjectsAndKeys:
-        (id)kCFBooleanTrue, NSMigratePersistentStoresAutomaticallyOption, 
-        (id)kCFBooleanTrue, NSInferMappingModelAutomaticallyOption, 
-        MCCloudMainStoreFileName, NSPersistentStoreUbiquitousContentNameKey,
-        self.cloudStoreURL, NSPersistentStoreUbiquitousContentURLKey, 
-        nil];
-    
-    // Here we use a migrator to keep memory low. If small store, could just use
+    // Here we use a migrator to keep memory low. If you have a small store, you could just use
     // the NSPersistentStoreCoordinator method migratePersistentStore:toURL:options:withType:error:
     MCPersistentStoreMigrator *migrator = [[MCPersistentStoreMigrator alloc] initWithManagedObjectModel:self.managedObjectModel sourceStoreURL:oldStoreURL destinationStoreURL:storeURL];
-    migrator.sourceStoreOptions = localOnlyOptions;
-    migrator.destinationStoreOptions = cloudOptions;
+    migrator.sourceStoreOptions = sourceOptions;
+    migrator.destinationStoreOptions = destinationOptions;
     
     // Begin migration
     BOOL migrationSucceeded = YES;
     [migrator beginMigration];
     
-    // Migrate the Note entity in batches of 100. This also migrates all objects connected to 
-    // the notes, either directly or indirectly.
+    // Migrate all entities. Relationships are always followed, unless they are 'snipped'.
     // To demonstrate that you can 'snip' a object graph up into sub-graphs, to avoid migrating
     // everything at once, we here snip a few relationships so that only Note and Facet objects are migrated first.
-    // Note that you can only snip optional relationships, otherwise validation will fail when saving.
+    // You can only snip optional relationships, otherwise validation will fail when saving.
+    // Batch size of 0 is infinite, ie, no batching.
     [migrator snipRelationship:@"permutations" inEntity:@"Note"];
     [migrator snipRelationship:@"permutations" inEntity:@"Facet"];
-    migrationSucceeded &= [migrator migrateEntityWithName:@"Note" batchSize:0 save:NO error:&error];
+    migrationSucceeded &= [migrator migrateEntityWithName:@"Note" batchSize:0 save:YES error:&error];
     
-    // Migrate the Permutations (and connected MOs) in now. Batch size of 0 is infinite, ie, no batching.
+    // Migrate the Permutations (and connected MOs) in now. Batches of 10 at a time.
     migrationSucceeded &= [migrator migrateEntityWithName:@"Permutation" batchSize:10 save:YES error:&error];
     
     // End migration
@@ -493,8 +445,47 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
         return;
     }
     else {
-        [[NSFileManager defaultManager] removeItemAtURL:oldStoreURL error:NULL];
+        [fileManager removeItemAtURL:oldStoreURL error:NULL];
     }
+}
+
+-(void)migrateStoreFromCloud:(void(^)(void))completionBlock
+{ 
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        // Simply remove the local store file. Next setup, a new store will be created
+        // and populated with data from iCloud.
+        [self removeApplicationDirectory];
+        
+        // Complete
+        dispatch_async(dispatch_get_main_queue(), completionBlock);
+    });
+}
+
+-(void)migrateStoreToCloud:(void(^)(void))completionBlock
+{
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        // Remove cloud files
+        [self removeCloudData];
+        
+        // Options for new cloud store
+        NSDictionary *localOnlyOptions = @{
+           NSMigratePersistentStoresAutomaticallyOption: @YES,
+           NSInferMappingModelAutomaticallyOption: @YES,
+           NSReadOnlyPersistentStoreOption: @YES
+        };
+        NSDictionary *cloudOptions = @{
+           NSMigratePersistentStoresAutomaticallyOption: @YES,
+           NSInferMappingModelAutomaticallyOption: @YES,
+           NSPersistentStoreUbiquitousContentNameKey: MCCloudMainStoreFileName,
+           NSPersistentStoreUbiquitousContentURLKey: self.cloudStoreURL
+        };
+        
+        // Migrate in place
+        [self migrateStoreAtURL:self.localStoreURL fromOptions:localOnlyOptions toOptions:cloudOptions];
+        
+        // Complete
+        dispatch_async(dispatch_get_main_queue(), completionBlock);
+    });
 }
 
 -(void)removeCloudData
@@ -530,7 +521,6 @@ static NSString * const TeamIdentifier = @"P7BXV6PHLD";
     [[NSUserDefaults standardUserDefaults] synchronize];
     
     [self removeCloudData];
-    [self setupCoreDataStack:self];
 }
 
 -(void)persistentStoreCoordinatorDidMergeCloudChanges:(NSNotification *)notification
