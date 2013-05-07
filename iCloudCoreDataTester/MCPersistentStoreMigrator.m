@@ -195,7 +195,9 @@
             }
             
             // If the inverse relationship is snipped, use the full KVC methods, so that it gets set too
-            if ( [exclusions containsObject:relationDescription.inverseRelationship.name] ) 
+            NSEntityDescription *relatedEntity = relationDescription.destinationEntity;
+            NSSet *exclusionsForRelatedEntity = [excludedRelationshipsByEntity objectForKey:relatedEntity.name];
+            if ( [exclusionsForRelatedEntity containsObject:relationDescription.inverseRelationship.name] ) 
                 [counterpart setValue:newValue forKey:key];
             else 
                 [counterpart setPrimitiveValue:newValue forKey:key];
